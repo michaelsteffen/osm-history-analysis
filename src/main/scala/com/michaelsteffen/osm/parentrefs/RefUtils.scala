@@ -1,7 +1,7 @@
 package com.michaelsteffen.osm.parentrefs
 
-import com.michaelsteffen.osm.osmdata._
 import scala.collection._
+import com.michaelsteffen.osm.osmdata._
 
 object RefUtils {
   val ADD = 0
@@ -12,7 +12,7 @@ object RefUtils {
     var lastVersionMembers = new mutable.HashSet[Ref]
 
     for (objVersion <- objHistory.versions) {
-      val members = objVersion.members.toSet
+      val members = objVersion.children.toSet
       val additions = members
         .diff(lastVersionMembers)
         .map((ref) => RefChange(
@@ -39,17 +39,18 @@ object RefUtils {
     changesBuffer.toList
   }
 
-  def consolidateRefChanges(childID: String, changeHistory: Iterator[RefChange]): RefChangeGroup = RefChangeGroup(
+  def collectRefChanges(childID: String, refChanges: Iterator[RefChange]): RefChangeGroupToPropagate = RefChangeGroupToPropagate(
     childID = childID,
-    changes = changeHistory.toList.sortWith(_.timestamp.getTime < _.timestamp.getTime)
+    changes = refChanges.toList.sortWith(_.timestamp.getTime < _.timestamp.getTime)
   )
 
-  def addParentRefs (objData: (OSMObjectHistory, RefChangeGroup)): OSMObjectHistory = {
+  def addParentRefs (objData: (OSMObjectHistory, RefChangeGroupToPropagate)): OSMObjectHistory = {
     if (objData._2 == null || objData._2.changes.isEmpty) {
       objData._1
     } else {
+      val objHistory = objData._1
       // we add a None at the end of the obj versions list to allow a lookahead in the for loop below
-      val objHistoryIterator = (objData._1.versions.map(Some(_)) ::: List(None)).iterator.sliding(2)
+      val objHistoryIterator = (objHistory.versions.map(Some(_)) ::: List(None)).iterator.sliding(2)
       val parentChangesIterator: Iterator[RefChange] = objData._2.changes.iterator
 
       var versionsBuffer = mutable.ListBuffer.empty[OSMObjectVersion]
@@ -69,12 +70,14 @@ object RefUtils {
         ) {
           if (parentChange.get.timestamp.getTime <= minorVersionTimestamp.getTime) {
             // apply ref change to the current object version
-            // we have to include the < case here, because in certain edge cases from the old API, a node can show up as
-            // reference ina way prior to the timestamp for its v1. this may have something to do with "unwayed
-            // segments", which is where I've seen it (see http://wiki.openstreetmap.org/wiki/Unwayed_segments). in any
-            // event, we just attribute all changes to the first node version
+            // We have to include the < case here, because in certain edge cases from the old API, a node can show up as
+            // reference in a way prior to the timestamp for its v1. This may have something to do with "unwayed
+            // segments", which is where I've seen it (see http://wiki.openstreetmap.org/wiki/Unwayed_segments). In any
+            // event, we just attribute all changes to the first node version.
+            // The == case is that these ref changes were part of the same upload as the one that caused us to create
+            // this minor version
             parentsBuffer = applyParentRefChange(parentsBuffer, parentChange.get)
-          } else if (parentChange.get.timestamp.getTime > minorVersionTimestamp.getTime) {
+          } else {
             // save current object version to versionsBuffer
             versionsBuffer += objVersion.copy(
               parents = parentsBuffer,
@@ -87,14 +90,12 @@ object RefUtils {
             minorVersionChangeset = parentChange.get.changeset
             minorVersionTimestamp = parentChange.get.timestamp
             parentsBuffer = applyParentRefChange(parentsBuffer, parentChange.get)
-          } else if (parentChange.get.timestamp.getTime < minorVersionTimestamp.getTime) {
-
-            throw new Exception(s"Data integrity logic error:\n$objData\n$parentChange\n$minorVersionTimestamp")
           }
+
           parentChange = if (parentChangesIterator.hasNext) Some(parentChangesIterator.next) else None
         }
 
-        // save current object version to versionsBuffer
+        // save final object version from this major-version subset to versionsBuffer
         versionsBuffer += objVersion.copy(
           parents = parentsBuffer,
           minorVersion = minorVersionNumber,
@@ -103,7 +104,7 @@ object RefUtils {
         )
       }
 
-      objData._1.copy(versions = versionsBuffer.toList)
+      objHistory.copy(versions = versionsBuffer.toList)
     }
   }
 

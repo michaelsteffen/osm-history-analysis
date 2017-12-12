@@ -26,11 +26,11 @@ object OSMDataUtils {
 
   // TODO: define lat/lon for nodes/relations
   private def toOSMObjectVersion (obj: RawOSMObjectVersion): OSMObjectVersion = OSMObjectVersion(
-    primaryFeatureTypes = getPrimaryFeatureType(obj.tags),
+    primaryFeatureTypes = getPrimaryFeatureType(obj.`type`(0).toString, obj.tags),
     tags = obj.tags,
     lat = obj.lat,
     lon = obj.lon,
-    members = convertRefs(obj.nds, obj.members),
+    children = convertRefs(obj.nds, obj.members),
     parents = List.empty[String],
     majorVersion = obj.version,
     minorVersion = 0,
@@ -39,8 +39,20 @@ object OSMDataUtils {
     visible = obj.visible
   )
 
-  private def getPrimaryFeatureType (tags: Map[String, Option[String]]): List[String] = {
-    tags.keys.filter((key) => PrimaryFeatures.contains(key)).toList
+  private def getPrimaryFeatureType (objType: String, tags: Map[String, Option[String]]): List[String] = {
+    val namedPrimaryFeatureTypes = tags.keys.filter((key) => PrimaryFeatures.contains(key)).toList
+
+    if (namedPrimaryFeatureTypes.nonEmpty) {
+      namedPrimaryFeatureTypes
+    } else {
+      objType match {
+        case "n" | "w" => if (tags.nonEmpty) List("unknown") else List.empty[String]
+        case "r" =>
+          // this makes old style multipolygons (i.e. ones w/ no tags on the relation) non-primary features, but that's
+          // OK, since their outer way(s) will be primary features
+          if (tags.get("type").contains(Some("multipolygon")) && tags.size > 1) List("unknown") else List.empty[String]
+      }
+    }
   }
 
   private def convertRefs (nodeRefs: List[RawNodeRef], memberRefs: List[RawMemberRef]): List[Ref] = {
