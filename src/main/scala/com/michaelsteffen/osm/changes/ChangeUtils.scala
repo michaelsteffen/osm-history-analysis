@@ -77,7 +77,6 @@ object ChangeUtils {
         .map(_.change)
     )
 
-
   def generateSecondOrderChanges(history: OSMObjectHistory, changeGroup: ChangeGroupToPropagate): ChangeResults = {
     @tailrec
     def generateRecursively(history: OSMObjectHistory, changeGroup: ChangeGroupToPropagate, accumulator: ChangeResults): ChangeResults = {
@@ -112,6 +111,19 @@ object ChangeUtils {
     }
 
     generateRecursively(history, changeGroup, ChangeResults.empty)
+  }
+
+  def coalesceChanges(changes: Iterator[Change]): List[Change] = {
+    changes.foldLeft(Map.empty[Int, Change])((map, c) => {
+      val hash = (c.primaryFeatureVersion, c.changeset, c.changeType).hashCode
+      map.get(hash) match {
+        case None => map + (hash -> c)
+        case Some(x) => map + (hash -> x.copy(
+          count = x.count + c.count,
+          extent = c.extent.map(e => x.extent.map(e.union).orElse(Some(e)).get).orElse(x.extent),
+          timestamp = new java.sql.Timestamp(math.max(x.timestamp.getTime, c.timestamp.getTime))))
+      }
+    }).values.toList
   }
 
   private def featureCreation(id: String, objVersion: OSMObjectVersion): ChangeResults = {

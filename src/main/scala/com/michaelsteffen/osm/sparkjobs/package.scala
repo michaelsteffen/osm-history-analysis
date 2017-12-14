@@ -32,12 +32,9 @@ package object sparkjobs {
 
     var changesToSave = spark.emptyDataset[Change]
     var changesToPropagate = spark.emptyDataset[ChangeGroupToPropagate]
-    var changesToPropagateCount: Long = 0
-    var i = 0
-    do {
-      i = i + 1
+    for (i <- 0 to 9) {
       val changesToSaveAndPropagate =
-        if (changesToPropagateCount == 0) history.map(ChangeUtils.generateFirstOrderChanges) //first loop only
+        if (i == 0) history.map(ChangeUtils.generateFirstOrderChanges) //first loop only
         else history
           .joinWith(changesToPropagate, $"id" === $"parentID")
           .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
@@ -49,10 +46,10 @@ package object sparkjobs {
         .flatMap(_.changesToPropagate)
         .groupByKey(_.parentID)
         .mapGroups(ChangeUtils.collectChangesToPropagate)
-      changesToPropagateCount = changesToPropagate.count
-      println(s"Iteration $i complete. Changes to propagate: $changesToPropagateCount.")
-    } while (changesToPropagateCount > 0)
+    }
 
     changesToSave
+      .groupByKey(_.primaryFeatureID)
+      .flatMapGroups((id, changes) => ChangeUtils.coalesceChanges(changes))
   }
 }

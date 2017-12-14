@@ -1,15 +1,14 @@
 package com.michaelsteffen.osm.changes
 
-import com.michaelsteffen.osm.osmdata.OSMObjectVersion
+import com.michaelsteffen.osm.osmdata._
 
 final case class Change (
   primaryFeatureID: String,
   primaryFeatureTypes: List[String],
-  primaryFeatureVersion: Long,            // version after the change
+  primaryFeatureVersion: Long, // version after the change
   changeType: Int,
   count: Int,
-  lat: Option[BigDecimal],
-  lon: Option[BigDecimal],
+  extent: Option[BboxExtent],
   timestamp: java.sql.Timestamp,
   changeset: Long
 ) {
@@ -19,8 +18,10 @@ final case class Change (
     primaryFeatureVersion = objVer.majorVersion,
     changeType = changeType,
     count = count,
-    lat = objVer.lat,
-    lon = objVer.lon,
+    extent =
+      if (objVer.lon.nonEmpty && objVer.lat.nonEmpty)
+        Some(BboxExtent(Point(objVer.lon.get, objVer.lat.get), Point(objVer.lon.get, objVer.lat.get)))
+      else None,
     timestamp = objVer.timestamp,
     changeset = objVer.changeset
   )
