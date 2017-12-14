@@ -22,7 +22,7 @@ package object sparkjobs {
 
     val history = historyWithoutParentRefs
       .joinWith(refChangesGroupedByChild, $"id" === $"childID", "left_outer")
-      .map(RefUtils.addParentRefs)
+      .map(t => RefUtils.addParentRefs(t._1, t._2))
 
     history
   }

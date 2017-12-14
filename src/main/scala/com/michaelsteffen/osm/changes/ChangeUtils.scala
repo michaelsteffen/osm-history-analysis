@@ -120,7 +120,7 @@ object ChangeUtils {
         case None => map + (hash -> c)
         case Some(x) => map + (hash -> x.copy(
           count = x.count + c.count,
-          extent = c.extent.map(e => x.extent.map(e.union).orElse(Some(e)).get).orElse(x.extent),
+          bbox = c.bbox.map(e => x.bbox.map(e.union).orElse(Some(e)).get).orElse(x.bbox),
           timestamp = new java.sql.Timestamp(math.max(x.timestamp.getTime, c.timestamp.getTime))))
       }
     }).values.toList

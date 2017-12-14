@@ -44,14 +44,13 @@ object RefUtils {
     changes = refChanges.toList.sortWith(_.timestamp.getTime < _.timestamp.getTime)
   )
 
-  def addParentRefs (objData: (OSMObjectHistory, RefChangeGroupToPropagate)): OSMObjectHistory = {
-    if (objData._2 == null || objData._2.changes.isEmpty) {
-      objData._1
+  def addParentRefs (objHistory: OSMObjectHistory, changeGroup: RefChangeGroupToPropagate): OSMObjectHistory = {
+    if (changeGroup == null || changeGroup.changes.isEmpty) {
+      objHistory
     } else {
-      val objHistory = objData._1
       // we add a None at the end of the obj versions list to allow a lookahead in the for loop below
       val objHistoryIterator = (objHistory.versions.map(Some(_)) ::: List(None)).iterator.sliding(2)
-      val parentChangesIterator: Iterator[RefChange] = objData._2.changes.iterator
+      val parentChangesIterator: Iterator[RefChange] = changeGroup.changes.iterator
 
       var versionsBuffer = mutable.ListBuffer.empty[OSMObjectVersion]
       var parentsBuffer = List.empty[String]

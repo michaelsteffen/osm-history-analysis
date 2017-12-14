@@ -8,7 +8,7 @@ final case class Change (
   primaryFeatureVersion: Long, // version after the change
   changeType: Int,
   count: Int,
-  extent: Option[BboxExtent],
+  bbox: Option[Bbox],
   timestamp: java.sql.Timestamp,
   changeset: Long
 ) {
@@ -18,9 +18,9 @@ final case class Change (
     primaryFeatureVersion = objVer.majorVersion,
     changeType = changeType,
     count = count,
-    extent =
+    bbox =
       if (objVer.lon.nonEmpty && objVer.lat.nonEmpty)
-        Some(BboxExtent(Point(objVer.lon.get, objVer.lat.get), Point(objVer.lon.get, objVer.lat.get)))
+        Some(Bbox(Point(objVer.lon.get, objVer.lat.get), Point(objVer.lon.get, objVer.lat.get)))
       else None,
     timestamp = objVer.timestamp,
     changeset = objVer.changeset
