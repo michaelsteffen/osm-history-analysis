@@ -18,7 +18,7 @@ package object sparkjobs {
     val refChangesGroupedByChild = historyWithoutParentRefs
       .flatMap(RefUtils.generateRefChangesFromObjectHistory)
       .groupByKey(_.childID)
-      .mapGroups(RefUtils.collectRefChanges)
+      .mapGroups(RefUtils.collectRefChangesForChild)
 
     val history = historyWithoutParentRefs
       .joinWith(refChangesGroupedByChild, $"id" === $"childID", "left_outer")
@@ -32,6 +32,9 @@ package object sparkjobs {
 
     var changesToSave = spark.emptyDataset[Change]
     var changesToPropagate = spark.emptyDataset[ChangeGroupToPropagate]
+
+    // we check for references up to 10 layers deep (e.g. relation->relation->relation->way->node)
+    // TODO: Add output for how many references don't bottom out at this level
     for (i <- 0 to 9) {
       val changesToSaveAndPropagate =
         if (i == 0) history.map(ChangeUtils.generateFirstOrderChanges) //first loop only

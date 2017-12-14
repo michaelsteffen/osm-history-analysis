@@ -39,7 +39,7 @@ object RefUtils {
     changesBuffer.toList
   }
 
-  def collectRefChanges(childID: String, refChanges: Iterator[RefChange]): RefChangeGroupToPropagate = RefChangeGroupToPropagate(
+  def collectRefChangesForChild(childID: String, refChanges: Iterator[RefChange]): RefChangeGroupToPropagate = RefChangeGroupToPropagate(
     childID = childID,
     changes = refChanges.toList.sortWith(_.timestamp.getTime < _.timestamp.getTime)
   )
