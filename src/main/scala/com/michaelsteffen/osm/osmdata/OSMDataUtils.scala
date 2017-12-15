@@ -50,7 +50,11 @@ object OSMDataUtils {
         case "r" =>
           // this makes old style multipolygons (i.e. ones w/ no tags on the relation) non-primary features, but that's
           // OK, since their outer way(s) will be primary features
-          if (tags.get("type").contains(Some("multipolygon")) && tags.size > 1) List("unknown") else List.empty[String]
+          if (tags.get("type").contains(Some("multipolygon"))) {
+            if (tags.size > 1) List("unknown") else List.empty[String]
+          } else {
+            if (tags.nonEmpty) List("unknown") else List.empty[String]
+          }
       }
     }
   }

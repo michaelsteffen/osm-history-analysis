@@ -111,37 +111,70 @@ class OSMDataUtilsTest extends UnitTest {
     }
 
     describe("when extracting primary feature types") {
-      it("should correctly handle a feature with no tags") {
-        val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(F.baseNodeRawVersion))
-        assert(converted.versions.head.primaryFeatureTypes === List.empty[String])
+      describe("from a feature with known primary feature tags") {
+        it("should correctly handle a feature with one primary feature tag") {
+          val rawVersion = F.baseNodeRawVersion.copy(tags = Map("amenity" -> Some("cafe")))
+          val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
+          assert(converted.versions.head.primaryFeatureTypes === List("amenity"))
+        }
+
+        it("should correctly handle a feature with one primary feature tag and one other tag") {
+          val rawVersion = F.baseNodeRawVersion.copy(
+            tags = Map("place" -> Some("town"), "name" -> Some("Springfield"))
+          )
+          val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
+          assert(converted.versions.head.primaryFeatureTypes === List("place"))
+        }
+
+        it("should correctly handle a feature with multiple primary feature tags") {
+          val rawVersion = F.baseNodeRawVersion.copy(
+            tags = Map("amenity" -> Some("cafe"), "craft" -> Some("piano_tuner"))
+          )
+          val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
+          assert(converted.versions.head.primaryFeatureTypes === List("amenity", "craft"))
+        }
       }
 
-      it("should correctly handle a feature with one known primary feature tag") {
-        val rawVersion = F.baseNodeRawVersion.copy(tags = Map("amenity" -> Some("cafe")))
-        val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
-        assert(converted.versions.head.primaryFeatureTypes === List("amenity"))
+      describe("from a node or way with no known primary feature tags") {
+        it("should correctly handle a node/way with no tags") {
+          val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(F.baseNodeRawVersion))
+          assert(converted.versions.head.primaryFeatureTypes === List.empty[String])
+        }
+
+        it("should correctly handle a node/way with one unknown tag") {
+          val rawVersion = F.baseNodeRawVersion.copy(tags = Map("foo" -> Some("bar")))
+          val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
+          assert(converted.versions.head.primaryFeatureTypes === List("unknown"))
+        }
       }
 
-      it("should correctly handle a feature with one unknown tag") {
-        val rawVersion = F.baseNodeRawVersion.copy(tags = Map("foo" -> Some("bar")))
-        val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
-        assert(converted.versions.head.primaryFeatureTypes === List("unknown"))
-      }
+      describe("from a relation with no known primary feature tags") {
+        val rawRelationVersion = F.baseNodeRawVersion.copy(`type` = "relation")
 
-      it("should correctly handle a feature with one known primary feature tag and one other tag") {
-        val rawVersion = F.baseNodeRawVersion.copy(
-          tags = Map("place" -> Some("town"), "name" -> Some("Springfield"))
-        )
-        val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
-        assert(converted.versions.head.primaryFeatureTypes === List("place"))
-      }
+        it("should correctly handle a relation with no tags") {
+          val converted = OSMDataUtils.toOSMObjectHistory("r100", Iterator(rawRelationVersion))
+          assert(converted.versions.head.primaryFeatureTypes === List.empty[String])
+        }
 
-      it("should correctly handle a feature with multiple primary feature tags") {
-        val rawVersion = F.baseNodeRawVersion.copy(
-          tags = Map("amenity" -> Some("cafe"), "craft" -> Some("piano_tuner"))
-        )
-        val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
-        assert(converted.versions.head.primaryFeatureTypes === List("amenity", "craft"))
+        it("should correctly handle a multipolygon with no other tags") {
+          val rawVersion = rawRelationVersion.copy(tags = Map("type" -> Some("multipolygon")))
+          val converted = OSMDataUtils.toOSMObjectHistory("r100", Iterator(rawVersion))
+          assert(converted.versions.head.primaryFeatureTypes === List.empty[String])
+        }
+
+        it("should correctly handle a non-multipolygon relation with an unknown tag") {
+          val rawVersion = rawRelationVersion.copy(tags = Map("foo" -> Some("bar")))
+          val converted = OSMDataUtils.toOSMObjectHistory("r100", Iterator(rawVersion))
+          assert(converted.versions.head.primaryFeatureTypes === List("unknown"))
+        }
+
+        it("should correctly handle a multipolygon with an unknown tag") {
+          val rawVersion = rawRelationVersion.copy(
+            tags = Map("type" -> Some("multipolygon"), "foo" -> Some("bar"))
+          )
+          val converted = OSMDataUtils.toOSMObjectHistory("r100", Iterator(rawVersion))
+          assert(converted.versions.head.primaryFeatureTypes === List("unknown"))
+        }
       }
     }
 

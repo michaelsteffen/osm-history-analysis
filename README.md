@@ -6,6 +6,12 @@ This repo includes ORC-formatted data for Washington, DC to get you started. Whe
 
 Requires [sbt](https://www.scala-sbt.org/)
 
+#### Test
+```
+sbt test
+```
+
+#### Build
 ```
 sbt assembly
 ```
@@ -14,7 +20,7 @@ sbt assembly
 
 #### 1. Install Spark 2.2.0
 
-#### 2. Start spark shell (with plenty of memory):
+#### 2. Start spark shell (plenty of memory helps):
 ```
 spark-shell --driver-memory 5g --jars target/scala-2.11/osm-history-analysis.jar
 ```
