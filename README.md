@@ -1,4 +1,4 @@
-Generate easily queryable OpenStreetMap change history using Spark. Uses OpenStreetMap ORC file generated from [osm2orc](https://github.com/mojodna/osm2orc).
+Generate easily queryable OpenStreetMap change history using Spark. Uses OpenStreetMap ORC files generated with [osm2orc](https://github.com/mojodna/osm2orc).
 
 This repo includes ORC-formatted data for Washington, DC to get you started. When you're ready to go global, you can use the world history file [hosted by AWS](https://aws.amazon.com/public-datasets/osm/).
 
@@ -18,38 +18,38 @@ sbt assembly
 
 ## Running Locally
 
-#### 1. Install Spark 2.2.0
+Requires Spark 2.2.0
 
-#### 2. Start spark shell (plenty of memory helps):
+### Generating change data
 ```
-spark-shell --driver-memory 5g --jars target/scala-2.11/osm-history-analysis.jar
-```
-
-#### 3. Generate augmented history for DC:
-```
-import com.michaelsteffen.osm.sparkjobs._
-
-val history = generateHistory(spark, "district-of-columbia.osh.orc")
-```
-
-#### 4. Generate changes for DC:
-```
-val changes = generateChanges(spark, history)
-changes.cache
+spark-submit \
+ --class com.michaelsteffen.osm.historyanalysis.App \
+ --master local[4] \
+ --driver-memory 5g \
+ target/scala-2.11/osm-history-analysis.jar \git
+ data/district-of-columbia.osh.orc \
+ path/to/output.orc
 ```
 
-#### 5. Query the data. 
+### Querying in Spark
 
-Import some useful things:
+Start spark-shell:
+```
+spark-shell --jars target/scala-2.11/osm-history-analysis.jar
+```
+
+Import some things and load the data:
 ```
 import org.apache.spark.sql.functions._
-import com.michaelsteffen.osm.changes.ChangeUtils._
+import com.michaelsteffen.osm.changes._
+
+val changes = spark.read.orc("path/to/changes.orc").as[Change]
 ```
 
 Count of new primary features by year:
 ```
 changes
-  .filter($"changeType" === FEATURE_CREATE)
+  .filter($"changeType" === ChangeUtils.FEATURE_CREATE)
   .groupBy(year($"timestamp"))
   .count
   .sort(desc("year(timestamp)"))
@@ -59,9 +59,9 @@ changes
 Count of new buildings in 2017:
 ```
 changes
-  .filter(_.primaryFeatureTypes == List("building"))
+  .filter(array_contains($"primaryFeatureTypes", "building"))
   .filter(year($"timestamp") === 2017)
-  .filter($"changeType" === FEATURE_CREATE)
+  .filter($"changeType" === ChangeUtils.FEATURE_CREATE)
   .count
 ```
 
@@ -73,13 +73,62 @@ changes
   .show()
 ```
 
-See the [Change](src/main/scala/com/michaelsteffen/osm/changes/Change.scala) class for the full list of available fields.
+View the schema:
+```
+changes.printSchema()
+```
 
 ## Running on AWS
 
-[Coming...]
+Requires the AWS [cli](https://aws.amazon.com/cli/).
 
-## Notes on the data format
+### Generating change file
 
-[Coming...]
+#### 1. Upload the JAR to s3
+```
+aws s3 cp target/scala-2.11/osm-history-analysis.jar s3://my-bucket/key
+```
+
+#### 2. Create the default EMR IAM roles if you don't already have them
+```
+aws emr create-default-roles
+```
+
+#### 3. Edit [steps.json](aws/steps.json)
+Add:
+- the JAR location on S3 from step 1, 
+- the location of the input OSM history ORC on S3, and 
+- your desired output location on S3.
+
+#### 5. Spin up an EMR cluster:
+```
+aws emr create-cluster \
+  --name "OSM History Analysis Cluster" \
+  --region us-east-1 \
+  --ec2-attributes SubnetId=subnet-######## \
+  --instance-type m4.2xlarge
+  --instance-count 5
+  --use-default-roles \
+  --configurations file://./aws/emrConfig.json \
+  --visible-to-all-users \ 
+  --applications Name="Spark" \
+  --release-label emr-5.11.0 \
+  --steps file://./aws/steps.json \
+  --log-uri s3://log-bucket/prefix \
+  --auto-terminate
+```
+
+Substitute one of your default VPC subnets in us-east-1 and your desired S3 url for logs.
+
+This will start an application-specific EMR cluster -- i.e., the cluster will spin up, run the OSM history job, and then shut down. 
+
+Using the EC2 types and cluster size specified above, a full world job should complete in about XXX hours.
+
+### Querying in Athena
+
+Coming...
+
+## More on data output 
+
+[Data Notes](data-notes.md) coming...
 

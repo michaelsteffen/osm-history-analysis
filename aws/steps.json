@@ -1,0 +1,13 @@
+[
+  {
+    "Name": "OSM History Analysis",
+    "Type": "Spark",
+    "ActionOnFailure": "TERMINATE_JOB_FLOW",
+    "Args": [
+      "--class", "com.michaelsteffen.osm.historyanalysis.App",
+      "s3://bucket/prefix/osm-history-analysis.jar",
+      "s3://bucket/prefix/input-orc-file.orc",
+      "s3://bucket/output-prefix.orc"
+    ]
+  }
+]

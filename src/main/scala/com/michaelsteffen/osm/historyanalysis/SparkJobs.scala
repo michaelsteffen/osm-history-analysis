@@ -1,15 +1,14 @@
-package com.michaelsteffen.osm
+package com.michaelsteffen.osm.historyanalysis
 
-import com.michaelsteffen.osm.osmdata._
-import com.michaelsteffen.osm.rawosmdata._
-import com.michaelsteffen.osm.parentrefs._
 import com.michaelsteffen.osm.changes._
+import com.michaelsteffen.osm.osmdata._
+import com.michaelsteffen.osm.parentrefs._
+import com.michaelsteffen.osm.rawosmdata._
 import org.apache.spark.sql._
 
-package object sparkjobs {
-  def generateHistory(spark: SparkSession, orcFile: String): Dataset[OSMObjectHistory] = {
+object SparkJobs {
+  def generateHistory(spark: SparkSession, rawHistory: Dataset[RawOSMObjectVersion]): Dataset[OSMObjectHistory] = {
     import spark.implicits._
-    val rawHistory = spark.read.orc(orcFile).as[RawOSMObjectVersion]
 
     val historyWithoutParentRefs = rawHistory
       .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))

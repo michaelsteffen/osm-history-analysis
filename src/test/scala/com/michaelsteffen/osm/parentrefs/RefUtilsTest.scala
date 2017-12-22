@@ -27,8 +27,8 @@ class RefUtilsTest extends UnitTest {
       it("should remove deleted parent refs from the major version of the object") {}
     }
     describe("when handling parent ref changes between major versions of an object") {
-      it("should create a minor version of the object and with new parent refs") {}
-      it("should create a minor version of the object and with deleted parent refs") {}
+      it("should create a minor version of the object, adding new parent refs") {}
+      it("should create a minor version of the object, excluding deleted parent refs") {}
       it("should consolidate contemporaneous parent changes into the same minor version of the object") {}
       it("should create multiple minor version of the object as needed") {}
     }
