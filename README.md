@@ -100,14 +100,14 @@ Add:
 - the location of the input OSM history ORC on S3, and 
 - your desired output location on S3.
 
-#### 5. Spin up an EMR cluster:
+#### 4. Spin up an EMR cluster:
 ```
 aws emr create-cluster \
   --name "OSM History Analysis Cluster" \
   --region us-east-1 \
   --ec2-attributes SubnetId=subnet-######## \
-  --instance-type m4.2xlarge
-  --instance-count 5
+  --instance-type m4.2xlarge \
+  --instance-count 5 \
   --use-default-roles \
   --configurations file://./aws/emrConfig.json \
   --visible-to-all-users \ 
@@ -122,13 +122,38 @@ Substitute one of your default VPC subnets in us-east-1 and your desired S3 url 
 
 This will start an application-specific EMR cluster -- i.e., the cluster will spin up, run the OSM history job, and then shut down. 
 
-Using the EC2 types and cluster size specified above, a full world job should complete in about XXX hours.
+Using the EC2 types and cluster size specified above, a full world job should complete in about XXX hours and cost about YYY dollars.
 
 ### Querying in Athena
 
-Coming...
+In the Athena console, or via the AWS CLI
+
+#### Create the table
+```
+CREATE EXTERNAL TABLE changes (
+  primaryFeatureID STRING,
+  primaryFeatureTypes ARRAY<STRING>,
+  primaryFeatureVersion BIGINT,
+  changeType INT,
+  count INT,
+  bbox STRUCT<min: STRUCT<lon: DECIMAL(10,7), lat: DECIMAL(9,7)>, max: STRUCT<lon: DECIMAL(10,7),lat: DECIMAL(9,7)>>,
+  timestamp TIMESTAMP, 
+  changeset BIGINT
+)
+STORED AS ORCFILE
+LOCATION 's3://bucket/prefix/changes.orc';
+```
+
+#### Count of new primary features by type in 2017:
+```
+SELECT primaryFeatureTypes, count(*) AS features
+FROM changes
+WHERE changeType = 0 AND year(timestamp) = 2017
+GROUP BY primaryFeatureTypes
+ORDER BY count(*) DESC
+```
 
 ## More on data output 
 
-[Data Notes](data-notes.md) coming...
+Coming...
 
