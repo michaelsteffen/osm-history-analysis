@@ -33,12 +33,12 @@ spark-submit \
 
 ### Querying in Spark
 
-Start spark-shell:
+#### Start spark-shell:
 ```
 spark-shell --jars target/scala-2.11/osm-history-analysis.jar
 ```
 
-Import some things and load the data:
+#### Import some things and load the data:
 ```
 import org.apache.spark.sql.functions._
 import com.michaelsteffen.osm.changes._
@@ -46,7 +46,7 @@ import com.michaelsteffen.osm.changes._
 val changes = spark.read.orc("path/to/changes.orc").as[Change]
 ```
 
-Count of new primary features by year:
+#### Count of new primary features by year:
 ```
 changes
   .filter($"changeType" === ChangeUtils.FEATURE_CREATE)
@@ -56,7 +56,7 @@ changes
   .show()
 ```
 
-Count of new buildings in 2017:
+#### Count of new buildings in 2017:
 ```
 changes
   .filter(array_contains($"primaryFeatureTypes", "building"))
@@ -65,7 +65,7 @@ changes
   .count
 ```
 
-All changes for a specific feature, in order:
+#### All changes for a specific feature, in order:
 ```
 changes
   .filter($"primaryFeatureID" === "w226013371")
@@ -73,7 +73,7 @@ changes
   .show()
 ```
 
-View the schema:
+#### View the schema:
 ```
 changes.printSchema()
 ```
@@ -100,7 +100,7 @@ Add:
 - the location of the input OSM history ORC on S3, and 
 - your desired output location on S3.
 
-#### 4. Spin up an EMR cluster:
+#### 4. Spin up an EMR cluster
 ```
 aws emr create-cluster \
   --name "OSM History Analysis Cluster" \
@@ -144,7 +144,7 @@ STORED AS ORCFILE
 LOCATION 's3://bucket/prefix/changes.orc';
 ```
 
-#### Count by change type in 2017:
+#### Count by change type in 2017
 ```
 WITH changeTypes AS (
   SELECT * FROM (
@@ -170,7 +170,7 @@ GROUP BY changeTypes.name
 ORDER BY count(*) DESC
 ```
 
-#### Count of new features by type in 2017:
+#### Count of new features by type in 2017
 ```
 SELECT primaryFeatureTypes, count(*) AS features
 FROM changes
