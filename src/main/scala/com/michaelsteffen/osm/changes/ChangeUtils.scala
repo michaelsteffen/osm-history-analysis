@@ -20,6 +20,7 @@ object ChangeUtils {
   def typeToString(changeType: Int): String = changeType match {
     case FEATURE_CREATE => "feature creation"
     case FEATURE_DELETE => "feature deletion"
+    // TODO: FEATURE_CHANGE_TYPE is currently unused
     case FEATURE_CHANGE_TYPE => "feature type change"
     case TAG_ADD => "tag addition"
     case TAG_DELETE => "tag deletion"
@@ -39,14 +40,14 @@ object ChangeUtils {
 
     for (objVersion <- objHistory.versions) {
       if (
-        (priorVersion.primaryFeatureTypes.isEmpty || !priorVersion.visible) &&
-        (objVersion.primaryFeatureTypes.nonEmpty && objVersion.visible)
+        (!priorVersion.isFeature || !priorVersion.visible) &&
+        (objVersion.isFeature && objVersion.visible)
       ) {
         changeResultsBuffer = changeResultsBuffer ++
           featureCreation(id, objVersion)
       } else if (
-        (priorVersion.primaryFeatureTypes.nonEmpty && priorVersion.visible) &&
-        (objVersion.primaryFeatureTypes.isEmpty || !objVersion.visible)
+        (priorVersion.isFeature && priorVersion.visible) &&
+        (!objVersion.isFeature || !objVersion.visible)
       ) {
         changeResultsBuffer = changeResultsBuffer ++
           featureDeletion(id, priorVersion)
@@ -59,7 +60,7 @@ object ChangeUtils {
           nodeAndMemberAdditions(id, objVersion, priorVersion) ++
           nodeAndMemberRemovals(id, objVersion, priorVersion)
         // if not a primary feature, keep only the results to propagate up
-        if (objVersion.primaryFeatureTypes.isEmpty)
+        if (objVersion.isFeature)
           changeResultsBuffer = changeResultsBuffer.copy(changesToSave = List.empty[Change])
       }
       priorVersion = objVersion
@@ -86,8 +87,11 @@ object ChangeUtils {
         val thisVersion = history.versions.head
         val thisVersionChanges = changeGroup.changes.map(c => Change(history.id, thisVersion, c.changeType, c.count))
         val changeResults = ChangeResults(
-          changesToSave = thisVersionChanges,
-          changesToPropagate = thisVersion.parents.flatMap(p => thisVersionChanges.map(c => ChangeToPropagate(p, c)))
+          changesToSave =
+            if (OSMDataUtils.hasGeometry(history.objType, thisVersion)) thisVersionChanges
+            else List.empty[Change],
+          changesToPropagate =
+            thisVersion.parents.flatMap(p => thisVersionChanges.map(c => ChangeToPropagate(p, c)))
         )
         accumulator ++ changeResults
       } else {
@@ -98,8 +102,11 @@ object ChangeUtils {
           .takeWhile(_.timestamp.getTime < nextVersion.timestamp.getTime)
           .map(c => Change(history.id, thisVersion, c.changeType, c.count))
         val changeResults = ChangeResults(
-          changesToSave = thisVersionChanges,
-          changesToPropagate = thisVersion.parents.flatMap(p => thisVersionChanges.map(c => ChangeToPropagate(p, c)))
+          changesToSave =
+            if (OSMDataUtils.hasGeometry(history.objType, thisVersion)) thisVersionChanges
+            else List.empty[Change],
+          changesToPropagate =
+            thisVersion.parents.flatMap(p => thisVersionChanges.map(c => ChangeToPropagate(p, c)))
         )
 
         generateRecursively(
@@ -141,7 +148,9 @@ object ChangeUtils {
   }
 
   private def tagAdditions(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
-    val newKeysCount = objVersion.tags.keys.toSet.diff(priorVersion.tags.keys.toSet).size
+    val newKeysCount =
+      objVersion.featureTypeTags.keys.toSet.diff(priorVersion.featureTypeTags.keys.toSet).size +
+      objVersion.featurePropertyTags.keys.toSet.diff(priorVersion.featurePropertyTags.keys.toSet).size
     if (newKeysCount > 0) ChangeResults(
       changesToSave = List(Change(id, objVersion, TAG_ADD, newKeysCount)),
       changesToPropagate = List.empty[ChangeToPropagate]
@@ -149,7 +158,9 @@ object ChangeUtils {
   }
 
   private def tagDeletions(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
-    val deletedKeysCount = priorVersion.tags.keys.toSet.diff(objVersion.tags.keys.toSet).size
+    val deletedKeysCount =
+      priorVersion.featureTypeTags.keys.toSet.diff(objVersion.featureTypeTags.keys.toSet).size +
+      priorVersion.featurePropertyTags.keys.toSet.diff(objVersion.featurePropertyTags.keys.toSet).size
     if (deletedKeysCount > 0) ChangeResults(
       changesToSave = List(Change(id, objVersion, TAG_DELETE, deletedKeysCount)),
       changesToPropagate = List.empty[ChangeToPropagate]
@@ -157,8 +168,11 @@ object ChangeUtils {
   }
 
   private def tagChanges(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
-    val sharedTags = objVersion.tags.keySet.intersect(priorVersion.tags.keySet)
-    val newValuesCount = sharedTags.count(key => objVersion.tags(key) != priorVersion.tags(key))
+    val sharedTypeTags = objVersion.featureTypeTags.keySet.intersect(priorVersion.featureTypeTags.keySet)
+    val sharedPropertyTags = objVersion.featurePropertyTags.keySet.intersect(priorVersion.featurePropertyTags.keySet)
+    val newValuesCount =
+      sharedTypeTags.count(key => objVersion.featureTypeTags(key) != priorVersion.featureTypeTags(key)) +
+      sharedPropertyTags.count(key => objVersion.featurePropertyTags(key) != priorVersion.featurePropertyTags(key))
     if (newValuesCount > 0) ChangeResults(
       changesToSave = List(Change(id, objVersion, TAG_MODIFY, newValuesCount)),
       changesToPropagate = List.empty[ChangeToPropagate]

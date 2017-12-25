@@ -172,7 +172,7 @@ ORDER BY count(*) DESC
 
 #### Count of new features by type in 2017
 ```
-SELECT primaryFeatureTypes, count(*) AS features
+SELECT primaryFeatureTypes, count(*) AS numchanges
 FROM changes
 WHERE changeType = 0 AND year(timestamp) = 2017
 GROUP BY primaryFeatureTypes
