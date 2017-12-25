@@ -26,7 +26,7 @@ spark-submit \
  --class com.michaelsteffen.osm.historyanalysis.App \
  --master local[4] \
  --driver-memory 5g \
- target/scala-2.11/osm-history-analysis.jar \git
+ target/scala-2.11/osm-history-analysis.jar \
  data/district-of-columbia.osh.orc \
  path/to/output.orc
 ```
@@ -144,7 +144,33 @@ STORED AS ORCFILE
 LOCATION 's3://bucket/prefix/changes.orc';
 ```
 
-#### Count of new primary features by type in 2017:
+#### Count by change type in 2017:
+```
+WITH changeTypes AS (
+  SELECT * FROM (
+    VALUES
+      (0, 'FEATURE_CREATE'),
+      (1, 'FEATURE_DELETE'),
+      (2, 'FEATURE_CHANGE_TYPE'),
+      (3, 'TAG_ADD'),
+      (4, 'TAG_DELETE'),
+      (5, 'TAG_MODIFY'),
+      (6, 'NODE_MOVE'),
+      (7, 'NODE_ADD'),
+      (8, 'NODE_REMOVE'),
+      (9, 'MEMBER_ADD'),
+      (10, 'MEMBER_REMOVE')
+  ) AS t (type, name) 
+)
+
+SELECT changeTypes.name, count(*) AS changes
+FROM changes LEFT JOIN changeTypes ON changes.changeType = changeTypes.type
+WHERE year(changes.timestamp) = 2017
+GROUP BY changeTypes.name
+ORDER BY count(*) DESC
+```
+
+#### Count of new features by type in 2017:
 ```
 SELECT primaryFeatureTypes, count(*) AS features
 FROM changes
@@ -156,4 +182,3 @@ ORDER BY count(*) DESC
 ## More on data output 
 
 Coming...
-
