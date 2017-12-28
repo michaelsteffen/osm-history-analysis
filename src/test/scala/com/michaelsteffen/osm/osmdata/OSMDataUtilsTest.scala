@@ -56,7 +56,6 @@ class OSMDataUtilsTest extends UnitTest {
             minorVersion = 0,
             timestamp = new Timestamp(2017, 1, 1, 0, 0, 0, 0),
             visible = true,
-            primaryFeatureTypes = List.empty[String],
             tags = Map.empty[String, Option[String]],
             lat = Some(-77.2),
             lon = Some(38.9),
@@ -108,74 +107,6 @@ class OSMDataUtilsTest extends UnitTest {
       )
 
       assert(OSMDataUtils.toOSMObjectHistory("n100", rawHistory) === convertedHistory)
-    }
-
-    describe("when extracting primary feature types") {
-      describe("from a feature with known primary feature tags") {
-        it("should correctly handle a feature with one primary feature tag") {
-          val rawVersion = F.baseNodeRawVersion.copy(tags = Map("amenity" -> Some("cafe")))
-          val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
-          assert(converted.versions.head.primaryFeatureTypes === List("amenity"))
-        }
-
-        it("should correctly handle a feature with one primary feature tag and one other tag") {
-          val rawVersion = F.baseNodeRawVersion.copy(
-            tags = Map("place" -> Some("town"), "name" -> Some("Springfield"))
-          )
-          val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
-          assert(converted.versions.head.primaryFeatureTypes === List("place"))
-        }
-
-        it("should correctly handle a feature with multiple primary feature tags") {
-          val rawVersion = F.baseNodeRawVersion.copy(
-            tags = Map("amenity" -> Some("cafe"), "craft" -> Some("piano_tuner"))
-          )
-          val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
-          assert(converted.versions.head.primaryFeatureTypes === List("amenity", "craft"))
-        }
-      }
-
-      describe("from a node or way with no known primary feature tags") {
-        it("should correctly handle a node/way with no tags") {
-          val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(F.baseNodeRawVersion))
-          assert(converted.versions.head.primaryFeatureTypes === List.empty[String])
-        }
-
-        it("should correctly handle a node/way with one unknown tag") {
-          val rawVersion = F.baseNodeRawVersion.copy(tags = Map("foo" -> Some("bar")))
-          val converted = OSMDataUtils.toOSMObjectHistory("n100", Iterator(rawVersion))
-          assert(converted.versions.head.primaryFeatureTypes === List("unknown"))
-        }
-      }
-
-      describe("from a relation with no known primary feature tags") {
-        val rawRelationVersion = F.baseNodeRawVersion.copy(`type` = "relation")
-
-        it("should correctly handle a relation with no tags") {
-          val converted = OSMDataUtils.toOSMObjectHistory("r100", Iterator(rawRelationVersion))
-          assert(converted.versions.head.primaryFeatureTypes === List.empty[String])
-        }
-
-        it("should correctly handle a multipolygon with no other tags") {
-          val rawVersion = rawRelationVersion.copy(tags = Map("type" -> Some("multipolygon")))
-          val converted = OSMDataUtils.toOSMObjectHistory("r100", Iterator(rawVersion))
-          assert(converted.versions.head.primaryFeatureTypes === List.empty[String])
-        }
-
-        it("should correctly handle a non-multipolygon relation with an unknown tag") {
-          val rawVersion = rawRelationVersion.copy(tags = Map("foo" -> Some("bar")))
-          val converted = OSMDataUtils.toOSMObjectHistory("r100", Iterator(rawVersion))
-          assert(converted.versions.head.primaryFeatureTypes === List("unknown"))
-        }
-
-        it("should correctly handle a multipolygon with an unknown tag") {
-          val rawVersion = rawRelationVersion.copy(
-            tags = Map("type" -> Some("multipolygon"), "foo" -> Some("bar"))
-          )
-          val converted = OSMDataUtils.toOSMObjectHistory("r100", Iterator(rawVersion))
-          assert(converted.versions.head.primaryFeatureTypes === List("unknown"))
-        }
-      }
     }
 
     describe("when converting child references") {

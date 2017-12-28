@@ -51,7 +51,7 @@ object SparkJobs {
     }
 
     changesToSave
-      .groupByKey(_.primaryFeatureID)
+      .groupByKey(_.featureID)
       .flatMapGroups((id, changes) => ChangeUtils.coalesceChanges(changes))
   }
 }

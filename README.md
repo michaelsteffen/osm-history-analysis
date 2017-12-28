@@ -46,30 +46,13 @@ import com.michaelsteffen.osm.changes._
 val changes = spark.read.orc("path/to/changes.orc").as[Change]
 ```
 
-#### Count of new primary features by year:
+#### Example: Count of new features by year:
 ```
 changes
   .filter($"changeType" === ChangeUtils.FEATURE_CREATE)
   .groupBy(year($"timestamp"))
   .count
   .sort(desc("year(timestamp)"))
-  .show()
-```
-
-#### Count of new buildings in 2017:
-```
-changes
-  .filter(array_contains($"primaryFeatureTypes", "building"))
-  .filter(year($"timestamp") === 2017)
-  .filter($"changeType" === ChangeUtils.FEATURE_CREATE)
-  .count
-```
-
-#### All changes for a specific feature, in order:
-```
-changes
-  .filter($"primaryFeatureID" === "w226013371")
-  .sort($"timestamp")
   .show()
 ```
 
@@ -84,23 +67,23 @@ Requires the AWS [cli](https://aws.amazon.com/cli/).
 
 ### Generating change file
 
-#### 1. Upload the JAR to s3
+#### Upload the JAR to s3
 ```
 aws s3 cp target/scala-2.11/osm-history-analysis.jar s3://my-bucket/key
 ```
 
-#### 2. Create the default EMR IAM roles if you don't already have them
+#### Create the default EMR IAM roles if you don't already have them
 ```
 aws emr create-default-roles
 ```
 
-#### 3. Edit [steps.json](aws/steps.json)
+#### Edit [steps.json](aws/steps.json)
 Add:
 - the JAR location on S3 from step 1, 
 - the location of the input OSM history ORC on S3, and 
 - your desired output location on S3.
 
-#### 4. Spin up an EMR cluster
+#### Spin up an EMR cluster
 ```
 aws emr create-cluster \
   --name "OSM History Analysis Cluster" \
@@ -126,16 +109,17 @@ Using the EC2 types and cluster size specified above, a full world job should co
 
 ### Querying in Athena
 
-In the Athena console, or via the AWS CLI
+In the Athena console, or via the AWS CLI:
 
 #### Create the table
 ```
 CREATE EXTERNAL TABLE changes (
-  primaryFeatureID STRING,
-  primaryFeatureTypes ARRAY<STRING>,
-  primaryFeatureVersion BIGINT,
+  featureID STRING,
   changeType INT,
   count INT,
+  version BIGINT,
+  tags MAP<STRING, STRING>,
+  tagChanges MAP<STRING, STRING>,,
   bbox STRUCT<min: STRUCT<lon: DECIMAL(10,7), lat: DECIMAL(9,7)>, max: STRUCT<lon: DECIMAL(10,7),lat: DECIMAL(9,7)>>,
   timestamp TIMESTAMP, 
   changeset BIGINT
@@ -144,22 +128,21 @@ STORED AS ORCFILE
 LOCATION 's3://bucket/prefix/changes.orc';
 ```
 
-#### Count by change type in 2017
+#### Example: Count by change type in 2017
 ```
 WITH changeTypes AS (
   SELECT * FROM (
     VALUES
       (0, 'FEATURE_CREATE'),
       (1, 'FEATURE_DELETE'),
-      (2, 'FEATURE_CHANGE_TYPE'),
-      (3, 'TAG_ADD'),
-      (4, 'TAG_DELETE'),
-      (5, 'TAG_MODIFY'),
-      (6, 'NODE_MOVE'),
-      (7, 'NODE_ADD'),
-      (8, 'NODE_REMOVE'),
-      (9, 'MEMBER_ADD'),
-      (10, 'MEMBER_REMOVE')
+      (2, 'TAG_ADD'),
+      (3, 'TAG_DELETE'),
+      (4, 'TAG_MODIFY'),
+      (5, 'NODE_MOVE'),
+      (6, 'NODE_ADD'),
+      (7, 'NODE_REMOVE'),
+      (8, 'MEMBER_ADD'),
+      (9, 'MEMBER_REMOVE')
   ) AS t (type, name) 
 )
 
@@ -167,15 +150,6 @@ SELECT changeTypes.name, count(*) AS changes
 FROM changes LEFT JOIN changeTypes ON changes.changeType = changeTypes.type
 WHERE year(changes.timestamp) = 2017
 GROUP BY changeTypes.name
-ORDER BY count(*) DESC
-```
-
-#### Count of new features by type in 2017
-```
-SELECT primaryFeatureTypes, count(*) AS numchanges
-FROM changes
-WHERE changeType = 0 AND year(timestamp) = 2017
-GROUP BY primaryFeatureTypes
 ORDER BY count(*) DESC
 ```
 
