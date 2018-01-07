@@ -11,25 +11,24 @@ object SparkJobs {
   def generateRefTree(rawHistoryLocation: String, outputLocation: String): Unit = {
     val spark = SparkSession.builder.getOrCreate()
     import spark.implicits._
+    val DEPTH = 10
 
-    val RefTree = spark.read.orc(rawHistoryLocation)
+    val RefChanges = spark.read.orc(rawHistoryLocation)
       .as[RawOSMObjectVersion]
       .filter(o => o.`type` == "way" || o.`type` == "rel" )
       .groupByKey(obj => OSMDataUtils.createID(obj.`type`, obj.id) //cheap shuffle b/c ORC is already sorted this way
       .flatMapGroups(RefUtils.generateReferenceChangesFromWayAndRelationHistories)
-      .groupByKey(_.childID)                                       //expensive shuffle
-      .mapGroups(RefUtils.collectRefHistoryForChild)
-  }
 
-  def generateChanges(Dataset[ReferenceHistory], historyLocation: String, outputLocation: String): Unit = {
-    val spark = SparkSession.builder.getOrCreate()
-    import spark.implicits._
-    val DEPTH = 10
+    // RefChanges.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "RefChanges.orc")
+
+    val RefTree = RefChanges
+      .groupByKey(_.childID)                                       //expensive shuffle
+      .mapGroups(RefUtils.coaleseRefTreeFromRefChanges)
 
     // on first pass we can look only at ways and relations, and all subsequent passes we can look only at relations
     val fullRefTree = RefTree
     val waysAndRelationsRefTree = fullRefTree.filter(o => o.isWay || o.isRelation)
-    val rlationsRefTree = fullRefTree.filter(o => o.isRelation)
+    val relationsRefTree = fullRefTree.filter(o => o.isRelation)
     fullRefTree.persist(StorageLevel.MEMORY_ONLY)
 
     // initialize accumulators
