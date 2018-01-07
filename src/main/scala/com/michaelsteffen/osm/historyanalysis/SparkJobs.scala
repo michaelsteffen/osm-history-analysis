@@ -8,39 +8,29 @@ import org.apache.spark.sql._
 import org.apache.spark.storage.StorageLevel
 
 object SparkJobs {
-  def generateHistory(rawHistoryLocation: String, outputLocation: String, saveIntermediateDatasets: Boolean): Unit = {
+  def generateRefTree(rawHistoryLocation: String, outputLocation: String): Unit = {
     val spark = SparkSession.builder.getOrCreate()
     import spark.implicits._
 
-    val rawHistory = spark.read.orc(rawHistoryLocation).as[RawOSMObjectVersion]
-
-    val historyWithoutParentRefs = rawHistory
-      .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
-      .mapGroups(OSMDataUtils.toOSMObjectHistory)
-
-    val refChangesGroupedByChild = historyWithoutParentRefs
-      .flatMap(RefUtils.generateRefChangesFromObjectHistory)
-      .groupByKey(_.childID)
-      .mapGroups(RefUtils.collectRefChangesForChild)
-
-    val history = historyWithoutParentRefs
-      .joinWith(refChangesGroupedByChild, $"id" === $"childID", "left_outer")
-      .map(t => RefUtils.addParentRefs(t._1, t._2))
-
-    history.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "history.orc")
-    historyWithoutParentRefs.unpersist()
+    val RefTree = spark.read.orc(rawHistoryLocation)
+      .as[RawOSMObjectVersion]
+      .filter(o => o.`type` == "way" || o.`type` == "rel" )
+      .groupByKey(obj => OSMDataUtils.createID(obj.`type`, obj.id) //cheap shuffle b/c ORC is already sorted this way
+      .flatMapGroups(RefUtils.generateReferenceChangesFromWayAndRelationHistories)
+      .groupByKey(_.childID)                                       //expensive shuffle
+      .mapGroups(RefUtils.collectRefHistoryForChild)
   }
 
-  def generateChanges(historyLocation: String, outputLocation: String, saveIntermediateDatasets: Boolean): Unit = {
+  def generateChanges(Dataset[ReferenceHistory], historyLocation: String, outputLocation: String): Unit = {
     val spark = SparkSession.builder.getOrCreate()
     import spark.implicits._
     val DEPTH = 10
 
     // on first pass we can look only at ways and relations, and all subsequent passes we can look only at relations
-    val fullHistory = spark.read.orc(historyLocation).as[OSMObjectHistory]
-    val waysAndRelations = fullHistory.filter(o => o.objType == "w" || o.objType == "r" )
-    val relations = fullHistory.filter(o => o.objType == "r" )
-    relations.persist(StorageLevel.MEMORY_ONLY_SER)
+    val fullRefTree = RefTree
+    val waysAndRelationsRefTree = fullRefTree.filter(o => o.isWay || o.isRelation)
+    val rlationsRefTree = fullRefTree.filter(o => o.isRelation)
+    fullRefTree.persist(StorageLevel.MEMORY_ONLY)
 
     // initialize accumulators
     val changesToSaveAndPropagate = new Array[Dataset[ChangeResults]](DEPTH)
@@ -69,7 +59,6 @@ object SparkJobs {
 
     // changesToSaveAndPropagate appears twice in the dependency graph. to avoid recomputing, we setup caching on each iteration
     // in trial runs, this persist made only a _very_ small difference (1%) vs recompute, but it makes the DAG much cleaner so what the heck
-    // changesToSaveAndPropagate.foreach(_.persist(StorageLevel.MEMORY_AND_DISK_SER))
     changesToPropagate(9).persist(StorageLevel.MEMORY_ONLY)
 
     // BOOM! Get all the changes to save, knocking down our 10 dominoes
