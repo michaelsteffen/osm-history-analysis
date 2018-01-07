@@ -1,0 +1,28 @@
+[
+  {
+    "Name": "master",
+    "InstanceGroupType": "MASTER",
+    "InstanceCount": 1,
+    "InstanceType": "r4.xlarge",
+    "BidPrice": "0.266"
+  },
+  {
+    "Name": "core",
+    "InstanceGroupType": "CORE",
+    "InstanceType": "r4.2xlarge",
+    "InstanceCount": 5,
+    "BidPrice": ".532",
+    "EbsConfiguration": {
+      "EbsOptimized": true,
+      "EbsBlockDeviceConfigs": [
+        {
+          "VolumeSpecification": {
+            "VolumeType": "gp2",
+            "SizeInGB": 4096
+          },
+          "VolumesPerInstance": 1
+        }
+      ]
+    }
+  }
+]

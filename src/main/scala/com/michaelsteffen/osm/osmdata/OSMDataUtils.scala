@@ -19,6 +19,18 @@ object OSMDataUtils {
     case _ => "?" + id.toString
   }
 
+  /*def createID (id: Long, objType: String): Long = {
+    if (id >= 2^61) throw new Exception(s"ID out of bounds: $id")
+    else {
+      objType match {
+        case "node" => id
+        case "way" => 2^61 + id
+        case "relation" => 2^62 + id
+        case _ => throw new Exception(s"Unknown object type: $id")
+      }
+    }
+  }*/
+
   def hasGeometry (objType: String, objVersion: OSMObjectVersion): Boolean = {
     objVersion.isFeature && (objType match {
       case "n" | "w" => true

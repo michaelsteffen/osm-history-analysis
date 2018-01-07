@@ -1,0 +1,16 @@
+[
+  {
+    "Classification": "spark-defaults",
+    "Properties": {
+      "spark.dynamicAllocation.enabled": "false",
+      "spark.executor.instances": "20",
+      "spark.yarn.executor.memoryOverhead": "3G",
+      "spark.executor.memory": "9G",
+      "spark.yarn.driver.memoryOverhead": "2G",
+      "spark.driver.memory": "3G",
+      "spark.executor.cores": "4",
+      "spark.driver.cores": "4",
+      "spark.default.parallelism": "200"
+    }
+  }
+]

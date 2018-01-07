@@ -1,22 +1,16 @@
-Generate easily queryable OpenStreetMap change history using Spark. Uses OpenStreetMap ORC files generated with [osm2orc](https://github.com/mojodna/osm2orc).
+Generate easily queryable OpenStreetMap change histories using Spark. Process the entire global history of OpenStreetMap -- XXX changes -- in 24 hours for under $50.
 
-This repo includes ORC-formatted data for Washington, DC to get you started. When you're ready to go global, you can use the world history file [hosted by AWS](https://aws.amazon.com/public-datasets/osm/).
+Uses OpenStreetMap ORC files generated with [osm2orc](https://github.com/mojodna/osm2orc). This repo includes ORC-formatted data for Washington, DC to get you started. When you're ready to go global, you can use the planet history file [hosted by AWS](https://aws.amazon.com/public-datasets/osm/). 
 
 ## Building
 
 Requires [sbt](https://www.scala-sbt.org/)
 
-#### Test
-```
-sbt test
-```
-
-#### Build
 ```
 sbt assembly
 ```
 
-## Running Locally
+## Running and querying locally 
 
 Requires Spark 2.2.0
 
@@ -24,21 +18,21 @@ Requires Spark 2.2.0
 ```
 spark-submit \
  --class com.michaelsteffen.osm.historyanalysis.App \
- --master local[4] \
- --driver-memory 5g \
+ --master local[*] \
+ --driver-memory 50g \
  target/scala-2.11/osm-history-analysis.jar \
  data/district-of-columbia.osh.orc \
  path/to/output.orc
 ```
 
-### Querying in Spark
+### Querying in spark-shell
 
-#### Start spark-shell:
+#### Start spark-shell
 ```
 spark-shell --jars target/scala-2.11/osm-history-analysis.jar
 ```
 
-#### Import some things and load the data:
+#### Import some things and load the data
 ```
 import org.apache.spark.sql.functions._
 import com.michaelsteffen.osm.changes._
@@ -46,7 +40,12 @@ import com.michaelsteffen.osm.changes._
 val changes = spark.read.orc("path/to/changes.orc").as[Change]
 ```
 
-#### Example: Count of new features by year:
+#### View the schema
+```
+changes.printSchema()
+```
+
+#### Example: Count of new features by year
 ```
 changes
   .filter($"changeType" === ChangeUtils.FEATURE_CREATE)
@@ -56,43 +55,45 @@ changes
   .show()
 ```
 
-#### View the schema:
-```
-changes.printSchema()
-```
-
-## Running on AWS
+## Running on AWS ElasticMapReduce and querying in AWS Athena
 
 Requires the AWS [cli](https://aws.amazon.com/cli/).
 
-### Generating change file
-
-#### Upload the JAR to s3
+### Generating change files
 ```
-aws s3 cp target/scala-2.11/osm-history-analysis.jar s3://my-bucket/key
+./emr-run.sh
 ```
 
-#### Create the default EMR IAM roles if you don't already have them
+The script will prompt you for:
+- a VPC subnet to run your cluster in (a subnet in us-east-1 recommended if you are running on the AWS-provided planet)
+- the location of the input OSM history ORC file(s) on S3 (use s3://osm-pds/planet-history/ for the AWS-provided planet)
+- an AWS bucket to be used for (1) the built JAR, (2) logs, and (3) outputs
+- a prefix within the bucket (optional)
+- cluster size (sm/lg/xl) (explained below)
+
+This will start an application-specific EMR cluster -- i.e., the cluster will spin up, run the OSM history job, and then shut down. 
+
+// TODO: Make shell script do everything below here:
+
+Create the default EMR IAM roles if you don't already have them
 ```
 aws emr create-default-roles
 ```
 
-#### Edit [steps.json](aws/steps.json)
-Add:
-- the JAR location on S3 from step 1, 
-- the location of the input OSM history ORC on S3, and 
-- your desired output location on S3.
+-Upload the JAR to s3
+```
+aws s3 cp target/scala-2.11/osm-history-analysis.jar s3://my-bucket/my-prefix/osm-history-analysis.jar
+```
 
-#### Spin up an EMR cluster
+-Spin up an EMR cluster
 ```
 aws emr create-cluster \
   --name "OSM History Analysis Cluster" \
   --region us-east-1 \
   --ec2-attributes SubnetId=subnet-######## \
-  --instance-type m4.2xlarge \
-  --instance-count 5 \
+  --instance-groups file://./aws/instanceGroups-sm.json \
+  --configurations file://./aws/emrConfig-sm.json \
   --use-default-roles \
-  --configurations file://./aws/emrConfig.json \
   --visible-to-all-users \ 
   --applications Name="Spark" \
   --release-label emr-5.11.0 \
@@ -101,17 +102,12 @@ aws emr create-cluster \
   --auto-terminate
 ```
 
-Substitute one of your default VPC subnets in us-east-1 and your desired S3 url for logs.
-
-This will start an application-specific EMR cluster -- i.e., the cluster will spin up, run the OSM history job, and then shut down. 
-
-Using the EC2 types and cluster size specified above, a full world job should complete in about XXX hours and cost about YYY dollars.
 
 ### Querying in Athena
 
-In the Athena console, or via the AWS CLI:
+In the Athena console, or via the AWS CLI...
 
-#### Create the table
+#### Create the tables
 ```
 CREATE EXTERNAL TABLE changes (
   featureID STRING,
@@ -152,6 +148,14 @@ WHERE year(changes.timestamp) = 2017
 GROUP BY changeTypes.name
 ORDER BY count(*) DESC
 ```
+
+### Notes on AWS EMR configurations
+
+I've included configurations for 3 different recommended cluster sizes in [./aws](/aws). All configurations run on Spot instances, with a bid at the On Demand price. Intermediate checkpointing to S3 to deal with lost Spot instances is a work in progress. I've had no issues with Spot interruptions, but if you're worried about it you can switch to On Demand instances.
+
+- Small -- Able to process an ORC of ~250 MB (e.g., medium US state) in ~30 minutes. Approx. $0.20-$0.40/hr depending on Spot prices.
+- Large -- 10x compute, 20x memory, 200x disk vs small. Able to process the planet history in about [[24]] hours. Approx. $1.60-$3.20/hr depending on Spot prices.
+- X-Large -- 4x or more compute (depending on how AWS meets instance-fleet requests), 4x memory, 1x disk vs large. Able to process the planet history in about [[8]] hours. Approx. [[XX]]/hr depending on Spot prices.
 
 ## More on data output 
 

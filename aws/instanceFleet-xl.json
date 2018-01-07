@@ -1,0 +1,83 @@
+[
+  {
+    "Name": "MasterFleet",
+    "InstanceFleetType": "MASTER",
+    "TargetOnDemandCapacity": 0,
+    "TargetSpotCapacity": 1,
+    "InstanceTypeConfigs": [{"InstanceType": "m4.large"}]
+  },
+  {
+    "Name": "CoreFleet",
+    "InstanceFleetType": "CORE",
+    "TargetSpotCapacity": 80,
+    // TODO: fixme
+    "LaunchSpecifications": {
+      "SpotSpecification": {
+        "TimeoutDurationMinutes": 20,
+        "TimeoutAction": "SWITCH_TO_ON_DEMAND"
+      }
+    },
+    "InstanceTypeConfigs": [
+      {
+        "InstanceType": "r4.large",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 1
+      },
+      {
+        "InstanceType": "r4.xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 2
+      },
+      {
+        "InstanceType": "r4.2xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 4
+      },
+      {
+        "InstanceType": "r4.4xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 8
+      },
+      {
+        "InstanceType": "r4.8xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 16
+      },
+      {
+        "InstanceType": "m4.xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 1
+      },
+      {
+        "InstanceType": "m4.2xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 2
+      },
+      {
+        "InstanceType": "m4.4xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 4
+      },
+      {
+        "InstanceType": "m4.8xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 8
+      },
+      {
+        "InstanceType": "c5.2xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 1
+      },
+      {
+        "InstanceType": "c5.4xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 2
+      },
+      {
+        "InstanceType": "c5.8xlarge",
+        "BidPriceAsPercentageOfOnDemandPrice": 100,
+        "WeightedCapacity": 4
+      }
+    ]
+  }
+]
