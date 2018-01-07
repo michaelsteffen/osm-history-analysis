@@ -1,0 +1,13 @@
+[
+  {
+    "Name": "OSM History Analysis",
+    "Type": "Spark",
+    "ActionOnFailure": "TERMINATE_JOB_FLOW",
+    "Args": [
+      "--class", "com.michaelsteffen.osm.historyanalysis.App",
+      "s3://osm-history/osm-history-analysis.jar",
+      "s3://osm-history/illinois.osh.orc",
+      "s3://osm-history/illinois-history/"
+    ]
+  }
+]

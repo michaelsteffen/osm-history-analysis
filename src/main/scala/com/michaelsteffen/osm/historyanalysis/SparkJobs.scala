@@ -18,8 +18,6 @@ object SparkJobs {
       .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
       .mapGroups(OSMDataUtils.toOSMObjectHistory)
 
-    // historyWithoutParentRefs.persist(StorageLevel.MEMORY_AND_DISK_SER)
-
     val refChangesGroupedByChild = historyWithoutParentRefs
       .flatMap(RefUtils.generateRefChangesFromObjectHistory)
       .groupByKey(_.childID)
@@ -42,7 +40,7 @@ object SparkJobs {
     val fullHistory = spark.read.orc(historyLocation).as[OSMObjectHistory]
     val waysAndRelations = fullHistory.filter(o => o.objType == "w" || o.objType == "r" )
     val relations = fullHistory.filter(o => o.objType == "r" )
-    relations.persist(StorageLevel.MEMORY_AND_DISK_SER)
+    relations.persist(StorageLevel.MEMORY_ONLY_SER)
 
     // initialize accumulators
     val changesToSaveAndPropagate = new Array[Dataset[ChangeResults]](DEPTH)
@@ -71,7 +69,7 @@ object SparkJobs {
 
     // changesToSaveAndPropagate appears twice in the dependency graph. to avoid recomputing, we setup caching on each iteration
     // in trial runs, this persist made only a _very_ small difference (1%) vs recompute, but it makes the DAG much cleaner so what the heck
-    changesToSaveAndPropagate.foreach(_.persist(StorageLevel.MEMORY_AND_DISK_SER))
+    // changesToSaveAndPropagate.foreach(_.persist(StorageLevel.MEMORY_AND_DISK_SER))
 
     // BOOM! Get all the changes to save, knocking down our 10 dominoes
     val changes =
