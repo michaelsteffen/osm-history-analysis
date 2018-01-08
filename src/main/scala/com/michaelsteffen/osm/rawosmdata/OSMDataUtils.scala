@@ -1,6 +1,6 @@
-package com.michaelsteffen.osm.osmdata
+package com.michaelsteffen.osm.rawosmdata
 
-import com.michaelsteffen.osm.rawosmdata._
+import com.michaelsteffen.osm.osmdata._
 
 object OSMDataUtils {
   def toOSMObjectHistory (id: String, rawObjHistory: Iterator[RawOSMObjectVersion]): OSMObjectHistory = OSMObjectHistory(
@@ -12,14 +12,7 @@ object OSMDataUtils {
       .map(toOSMObjectVersion)
   )
 
-  def createID (id: Long, objType: String): String = objType match {
-    case "node" => "n" + id.toString
-    case "way" => "w" + id.toString
-    case "relation" => "r" + id.toString
-    case _ => "?" + id.toString
-  }
-
-  /*def createID (id: Long, objType: String): Long = {
+  def createID (id: Long, objType: String): Long = {
     if (id >= 2^61) throw new Exception(s"ID out of bounds: $id")
     else {
       objType match {
@@ -29,7 +22,7 @@ object OSMDataUtils {
         case _ => throw new Exception(s"Unknown object type: $id")
       }
     }
-  }*/
+  }
 
   def hasGeometry (objType: String, objVersion: OSMObjectVersion): Boolean = {
     objVersion.isFeature && (objType match {
@@ -39,7 +32,7 @@ object OSMDataUtils {
   }
 
   // TODO: define lat/lon for nodes/relations
-  private def toOSMObjectVersion (obj: RawOSMObjectVersion): OSMObjectVersion = OSMObjectVersion(
+  private def toOSMObjectVersion (obj: RawOSMObjectVersion): OSMObjectVersion = OSMObjectVersionDEPRECATED(
     tags = obj.tags,
     lat = obj.lat,
     lon = obj.lon,

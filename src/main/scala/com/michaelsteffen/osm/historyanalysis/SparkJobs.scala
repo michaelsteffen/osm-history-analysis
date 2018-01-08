@@ -8,7 +8,7 @@ import org.apache.spark.sql._
 import org.apache.spark.storage.StorageLevel
 
 object SparkJobs {
-  def generateRefTree(rawHistoryLocation: String, outputLocation: String): Unit = {
+  def generateChanges(rawHistoryLocation: String, outputLocation: String): Unit = {
     val spark = SparkSession.builder.getOrCreate()
     import spark.implicits._
     val DEPTH = 10
@@ -17,16 +17,16 @@ object SparkJobs {
       .as[RawOSMObjectVersion]
       .filter(o => o.`type` == "way" || o.`type` == "rel" )
       .groupByKey(obj => OSMDataUtils.createID(obj.`type`, obj.id) //cheap shuffle b/c ORC is already sorted this way
-      .flatMapGroups(RefUtils.generateReferenceChangesFromWayAndRelationHistories)
+      .flatMapGroups(RefUtils.generateRefChanges)
 
     // RefChanges.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "RefChanges.orc")
 
-    val RefTree = RefChanges
+    val FullRefTree = RefChanges
       .groupByKey(_.childID)                                       //expensive shuffle
-      .mapGroups(RefUtils.coaleseRefTreeFromRefChanges)
+      .sortwithingroupsby(timestamp)
+      .mapGroups(RefUtils.coaleseRefTree)
 
     // on first pass we can look only at ways and relations, and all subsequent passes we can look only at relations
-    val fullRefTree = RefTree
     val waysAndRelationsRefTree = fullRefTree.filter(o => o.isWay || o.isRelation)
     val relationsRefTree = fullRefTree.filter(o => o.isRelation)
     fullRefTree.persist(StorageLevel.MEMORY_ONLY)
@@ -40,13 +40,15 @@ object SparkJobs {
     for (i <- 0 until DEPTH) {
       changesToSaveAndPropagate(i) =
         if (i == 0)
-          fullHistory.map(ChangeUtils.generateFirstOrderChanges) //first loop only
+          spark.read.orc(rawHistoryLocation)
+            .as[RawOSMObjectVersion]
+            .map(ChangeUtils.generateFirstOrderChanges)
         else if (i == 1)
-          waysAndRelations
+          waysAndRelationsRefTree
           .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
           .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
         else
-          relations
+          relationsRefTree
             .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
             .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
 
@@ -56,8 +58,6 @@ object SparkJobs {
         .mapGroups(ChangeUtils.collectChangesToPropagate)
     }
 
-    // changesToSaveAndPropagate appears twice in the dependency graph. to avoid recomputing, we setup caching on each iteration
-    // in trial runs, this persist made only a _very_ small difference (1%) vs recompute, but it makes the DAG much cleaner so what the heck
     changesToPropagate(9).persist(StorageLevel.MEMORY_ONLY)
 
     // BOOM! Get all the changes to save, knocking down our 10 dominoes

@@ -25,8 +25,7 @@ object App {
         optimizeParallelism(recordCount)
 
         // do all the things
-        SparkJobs.generateHistory(opts("inputDataLocation"), opts("outputDataLocation"), saveIntermediateDatasets=false)
-        SparkJobs.generateChanges(opts("outputDataLocation") + "history.orc", opts("outputDataLocation"), saveIntermediateDatasets=false)
+        SparkJobs.generateChanges(opts("outputDataLocation") + "history.orc", opts("outputDataLocation"))
 
         spark.stop()
     }

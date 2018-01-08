@@ -1,6 +1,6 @@
 package com.michaelsteffen.osm.osmdata
 
-final case class OSMObjectVersion(
+final case class OSMObjectVersionDEPRECATED(
   majorVersion: Long,
   minorVersion: Long,     // incremented when 'parents' change
   timestamp: java.sql.Timestamp,
@@ -17,8 +17,8 @@ final case class OSMObjectVersion(
   def isFeature: Boolean = !(tags.isEmpty || tags == Map("type" -> Some("multipolygon")))
 }
 
-object OSMObjectVersion {
-  def empty: OSMObjectVersion = OSMObjectVersion(
+object OSMObjectVersionDEPRECATED {
+  def empty: OSMObjectVersionDEPRECATED = OSMObjectVersionDEPRECATED(
     majorVersion = 0,
     minorVersion = 0,
     timestamp = new java.sql.Timestamp(0),

@@ -51,7 +51,7 @@ class OSMDataUtilsTest extends UnitTest {
         objType = "n",
         id = "n100",
         versions = List(
-          OSMObjectVersion(
+          OSMObjectVersionDEPRECATED(
             majorVersion = 1,
             minorVersion = 0,
             timestamp = new Timestamp(2017, 1, 1, 0, 0, 0, 0),

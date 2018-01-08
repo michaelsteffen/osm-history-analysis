@@ -5,7 +5,7 @@ import com.michaelsteffen.osm.testspecs._
 
 class OSMObjectVersionTest extends UnitTest {
   describe("An OSMObjectVersion") {
-    val baseVersion =  OSMObjectVersion(
+    val baseVersion =  OSMObjectVersionDEPRECATED(
       majorVersion = 1,
       minorVersion = 0,
       timestamp = new Timestamp(2017, 1, 1, 0, 0, 0, 0),

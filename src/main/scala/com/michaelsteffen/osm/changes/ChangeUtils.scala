@@ -3,6 +3,7 @@ package com.michaelsteffen.osm.changes
 import scala.collection._
 import scala.annotation.tailrec
 import com.michaelsteffen.osm.osmdata._
+import com.michaelsteffen.osm.rawosmdata.OSMDataUtils
 
 object ChangeUtils {
   val FEATURE_CREATE = 0
@@ -18,7 +19,7 @@ object ChangeUtils {
 
   def generateFirstOrderChanges(objHistory: OSMObjectHistory): ChangeResults = {
     var changeResultsBuffer = ChangeResults.empty
-    var priorVersion = OSMObjectVersion.empty
+    var priorVersion = OSMObjectVersionDEPRECATED.empty
     val id = objHistory.id
 
     for (objVersion <- objHistory.versions) {
@@ -117,21 +118,21 @@ object ChangeUtils {
     }).values.toList
   }
 
-  private def featureCreation(id: String, objVersion: OSMObjectVersion): ChangeResults = {
+  private def featureCreation(id: String, objVersion: OSMObjectVersionDEPRECATED): ChangeResults = {
     ChangeResults(
       changesToSave = List(Change.nonTagChange(id, FEATURE_CREATE, 1, objVersion)),
       changesToPropagate = List.empty[ChangeToPropagate]
     )
   }
 
-  private def featureDeletion(id: String, objVersion: OSMObjectVersion): ChangeResults = {
+  private def featureDeletion(id: String, objVersion: OSMObjectVersionDEPRECATED): ChangeResults = {
     ChangeResults(
       changesToSave = List(Change.nonTagChange(id, FEATURE_DELETE, 1, objVersion)),
       changesToPropagate = List.empty[ChangeToPropagate]
     )
   }
 
-  private def tagAdditions(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
+  private def tagAdditions(id: String, objVersion: OSMObjectVersionDEPRECATED, priorVersion: OSMObjectVersionDEPRECATED): ChangeResults = {
     val newKeys = objVersion.tags.keys.toSet.diff(priorVersion.tags.keys.toSet)
     if (newKeys.nonEmpty) ChangeResults(
       changesToSave = List(Change.tagChange(id, TAG_ADD, newKeys.size, priorVersion, objVersion, objVersion.tags.filterKeys(newKeys))),
@@ -139,7 +140,7 @@ object ChangeUtils {
     ) else ChangeResults.empty
   }
 
-  private def tagDeletions(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
+  private def tagDeletions(id: String, objVersion: OSMObjectVersionDEPRECATED, priorVersion: OSMObjectVersionDEPRECATED): ChangeResults = {
     val deletedKeys = priorVersion.tags.keys.toSet.diff(objVersion.tags.keys.toSet)
     if (deletedKeys.nonEmpty) ChangeResults(
       changesToSave = List(Change.tagChange(id, TAG_DELETE, deletedKeys.size, priorVersion, objVersion, priorVersion.tags.filterKeys(deletedKeys))),
@@ -147,7 +148,7 @@ object ChangeUtils {
     ) else ChangeResults.empty
   }
 
-  private def tagChanges(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
+  private def tagChanges(id: String, objVersion: OSMObjectVersionDEPRECATED, priorVersion: OSMObjectVersionDEPRECATED): ChangeResults = {
     val sharedKeys = objVersion.tags.keySet.intersect(priorVersion.tags.keySet)
     val keysWithChanges = sharedKeys.filter(key => objVersion.tags(key) != priorVersion.tags(key))
     if (keysWithChanges.nonEmpty) ChangeResults(
@@ -156,7 +157,7 @@ object ChangeUtils {
     ) else ChangeResults.empty
   }
 
-  private def nodeMoves(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
+  private def nodeMoves(id: String, objVersion: OSMObjectVersionDEPRECATED, priorVersion: OSMObjectVersionDEPRECATED): ChangeResults = {
     if (id(0) == 'n' && (objVersion.lat, objVersion.lon) != (priorVersion.lat, priorVersion.lon)) {
       val change = Change.nonTagChange(id, NODE_MOVE, 1, objVersion)
       ChangeResults(
@@ -168,7 +169,7 @@ object ChangeUtils {
     }
   }
 
-  private def nodeAndMemberAdditions(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
+  private def nodeAndMemberAdditions(id: String, objVersion: OSMObjectVersionDEPRECATED, priorVersion: OSMObjectVersionDEPRECATED): ChangeResults = {
     if (id(0) == 'w' || id(0) == 'r') {
       val newMembersCount = objVersion.children.toSet.diff(priorVersion.children.toSet).size
       val changeType = if (id(0) == 'w') NODE_ADD else MEMBER_ADD
@@ -182,7 +183,7 @@ object ChangeUtils {
     } else ChangeResults.empty
   }
 
-  private def nodeAndMemberRemovals(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
+  private def nodeAndMemberRemovals(id: String, objVersion: OSMObjectVersionDEPRECATED, priorVersion: OSMObjectVersionDEPRECATED): ChangeResults = {
     if (id(0) == 'w' || id(0) == 'r') {
       val removedMembersCount = priorVersion.children.toSet.diff(objVersion.children.toSet).size
       val changeType = if (id(0) == 'w') NODE_REMOVE else MEMBER_REMOVE

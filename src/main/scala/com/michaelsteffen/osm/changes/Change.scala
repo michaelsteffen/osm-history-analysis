@@ -13,7 +13,7 @@ final case class Change (
   timestamp: java.sql.Timestamp,
   changeset: Long
 ) {
-  def this(id: String, changeType: Int, count: Int, after: OSMObjectVersion) = this(
+  def this(id: String, changeType: Int, count: Int, after: OSMObjectVersionDEPRECATED) = this(
     featureID = id,
     changeType = changeType,
     count = count,
@@ -29,7 +29,7 @@ final case class Change (
     changeset = after.changeset
   )
 
-  def this(id: String, changeType: Int, count: Int, before: OSMObjectVersion, after: OSMObjectVersion, tagChanges: Map[String, Option[String]]) = this(
+  def this(id: String, changeType: Int, count: Int, before: OSMObjectVersionDEPRECATED, after: OSMObjectVersionDEPRECATED, tagChanges: Map[String, Option[String]]) = this(
     featureID = id,
     changeType = changeType,
     count = count,
@@ -43,10 +43,10 @@ final case class Change (
 }
 
 object Change {
-  def nonTagChange(id: String, changeType: Int, count: Int, after: OSMObjectVersion) =
+  def nonTagChange(id: String, changeType: Int, count: Int, after: OSMObjectVersionDEPRECATED) =
     new Change(id, changeType, count, after)
 
-  def tagChange(id: String, changeType: Int, count: Int, before: OSMObjectVersion, after: OSMObjectVersion, tagChanges: Map[String, Option[String]]) =
+  def tagChange(id: String, changeType: Int, count: Int, before: OSMObjectVersionDEPRECATED, after: OSMObjectVersionDEPRECATED, tagChanges: Map[String, Option[String]]) =
     new Change(id, changeType, count, before, after, tagChanges)
 
   def lonLatToBbox(lon: Option[BigDecimal], lat: Option[BigDecimal]): Option[Bbox] = {

@@ -7,44 +7,36 @@ object RefUtils {
   val ADD = 0
   val DELETE = 1
 
-  def generateRefChangesFromObjectHistory(objHistory: OSMObjectHistory): List[RefChange] = {
-    var changesBuffer = new mutable.ListBuffer[RefChange]
-    var lastVersionMembers = new mutable.HashSet[Ref]
+  // iterator->iterator function
+  def generateRefChanges(objVersions: Iterator[OSMObjectVersionDEPRECATED]): Iterator[RefChange] = {
 
-    for (objVersion <- objHistory.versions) {
-      val members = objVersion.children.toSet
+    // TODO -- zip so we have lastversion members too
+    objVersions.flatMap(ver => {
+      val members = ver.children.toSet
       val additions = members
         .diff(lastVersionMembers)
         .map((ref) => RefChange(
-          childID = ref.ref,
-          parentID = objHistory.id,
-          changeset = objVersion.changeset,
-          timestamp = objVersion.timestamp,
+          childID = OSMDataUtils.createID(ref.ref),
+          parentID = ver.id,
+          changeset = ver.changeset,
+          timestamp = ver.timestamp,
           changeType = RefUtils.ADD
         ))
       val deletions = lastVersionMembers
         .diff(members)
         .map((ref) => RefChange(
           childID = ref.ref,
-          parentID = objHistory.id,
-          changeset = objVersion.changeset,
-          timestamp = objVersion.timestamp,
+          parentID = OSMDataUtils.createID(ver.id),
+          changeset = ver.changeset,
+          timestamp = ver.timestamp,
           changeType = RefUtils.DELETE
         ))
-      changesBuffer ++= (additions ++ deletions)
-      // convert immutable (members) to mutable (lastVersionMembers)
-      lastVersionMembers = mutable.HashSet(members.toList: _*)
-    }
 
-    changesBuffer.toList
+      additions ++ deletions
+    })
   }
 
-  def collectRefChangesForChild(childID: String, refChanges: Iterator[RefChange]): RefChangeGroupToPropagate = RefChangeGroupToPropagate(
-    childID = childID,
-    changes = refChanges.toList.sortWith(_.timestamp.getTime < _.timestamp.getTime)
-  )
-
-  def addParentRefs (objHistory: OSMObjectHistory, changeGroup: RefChangeGroupToPropagate): OSMObjectHistory = {
+  def coaleseRefTree (objHistory: OSMObjectHistory, changeGroup: RefChangeGroupToPropagate): OSMObjectHistory = {
     if (changeGroup == null || changeGroup.changes.isEmpty) {
       objHistory
     } else {
@@ -52,7 +44,7 @@ object RefUtils {
       val objHistoryIterator = (objHistory.versions.map(Some(_)) ::: List(None)).iterator.sliding(2)
       val parentChangesIterator: Iterator[RefChange] = changeGroup.changes.iterator
 
-      var versionsBuffer = mutable.ListBuffer.empty[OSMObjectVersion]
+      var versionsBuffer = mutable.ListBuffer.empty[OSMObjectVersionDEPRECATED]
       var parentsBuffer = List.empty[String]
       var parentChange: Option[RefChange] = Some(parentChangesIterator.next)
 
