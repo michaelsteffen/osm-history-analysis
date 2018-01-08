@@ -1,6 +1,8 @@
 package com.michaelsteffen.osm.osmdata
 
 import java.sql.Timestamp
+
+import com.michaelsteffen.osm.rawosmdata.Ref
 import com.michaelsteffen.osm.testspecs._
 
 class OSMObjectVersionTest extends UnitTest {

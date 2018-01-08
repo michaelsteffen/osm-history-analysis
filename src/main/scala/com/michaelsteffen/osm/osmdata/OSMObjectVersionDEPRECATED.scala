@@ -1,5 +1,7 @@
 package com.michaelsteffen.osm.osmdata
 
+import com.michaelsteffen.osm.rawosmdata.Ref
+
 final case class OSMObjectVersionDEPRECATED(
   majorVersion: Long,
   minorVersion: Long,     // incremented when 'parents' change

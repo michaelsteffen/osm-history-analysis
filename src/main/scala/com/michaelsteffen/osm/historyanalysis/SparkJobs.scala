@@ -21,22 +21,25 @@ object SparkJobs {
 
     // RefChanges.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "RefChanges.orc")
 
-    val FullRefTree = RefChanges
+    val fullRefTree = RefChanges
       .groupByKey(_.childID)                                       //expensive shuffle
       .sortwithingroupsby(timestamp)
       .mapGroups(RefUtils.coaleseRefTree)
 
-    // on first pass we can look only at ways and relations, and all subsequent passes we can look only at relations
+    // setup for iterative traversal of the tree . . .
+    // on second pass we can look only at ways and relations, and all subsequent passes we can look only at relations
     val waysAndRelationsRefTree = fullRefTree.filter(o => o.isWay || o.isRelation)
     val relationsRefTree = fullRefTree.filter(o => o.isRelation)
     fullRefTree.persist(StorageLevel.MEMORY_ONLY)
+    // ??? on this one
+    relationsRefTree.persist(StorageLevel.MEMORY_ONLY)
 
     // initialize accumulators
     val changesToSaveAndPropagate = new Array[Dataset[ChangeResults]](DEPTH)
     val changesToPropagate = new Array[Dataset[ChangeGroupToPropagate]](DEPTH)
 
-    // iterate to propagate node moves through references up to 10 layers deep (e.g. relation->relation->relation->way->node)
-    // this loop just creates the dependency graph, we don't knock down the dominoes just yet
+    // iterate to propagate changes up through references up to 10 layers deep (e.g. relation->relation->relation->way->node)
+    // remember -- this loop just creates the dependency graph, we don't knock down the dominoes just yet
     for (i <- 0 until DEPTH) {
       changesToSaveAndPropagate(i) =
         if (i == 0)
@@ -58,9 +61,10 @@ object SparkJobs {
         .mapGroups(ChangeUtils.collectChangesToPropagate)
     }
 
+    // flag to hold onto this one so we don't have to generate it twice. should be empty or close to it
     changesToPropagate(9).persist(StorageLevel.MEMORY_ONLY)
 
-    // BOOM! Get all the changes to save, knocking down our 10 dominoes
+    // Almost ready . . .
     val changes =
       changesToSaveAndPropagate
       .map(_.flatMap(_.changesToSave))
@@ -68,6 +72,7 @@ object SparkJobs {
       .groupByKey(_.featureID)
       .flatMapGroups((id, changes) => ChangeUtils.coalesceChanges(changes))
 
+    // And . . . BOOM! Save all the changes, the first action, finally triggering our long chain of dominoes
     changes.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "changes.orc")
 
     // save any residual changesToPropagate so we can see what (if any) failed to resolve after 10 iterations

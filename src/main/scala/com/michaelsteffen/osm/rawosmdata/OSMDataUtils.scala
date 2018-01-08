@@ -3,7 +3,7 @@ package com.michaelsteffen.osm.rawosmdata
 import com.michaelsteffen.osm.osmdata._
 
 object OSMDataUtils {
-  def toOSMObjectHistory (id: String, rawObjHistory: Iterator[RawOSMObjectVersion]): OSMObjectHistory = OSMObjectHistory(
+  def toOSMObjectHistory (id: String, rawObjHistory: Iterator[RawOSMObjectVersion]): OSMObjectHistoryDEPRECATED = OSMObjectHistory(
     id = id,
     objType = id(0).toString,
     versions = rawObjHistory

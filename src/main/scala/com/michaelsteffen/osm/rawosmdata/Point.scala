@@ -1,4 +1,4 @@
-package com.michaelsteffen.osm.osmdata
+package com.michaelsteffen.osm.rawosmdata
 
 final case class Point (
   lon: BigDecimal,

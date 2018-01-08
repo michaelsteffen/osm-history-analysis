@@ -1,4 +1,6 @@
-package com.michaelsteffen.osm.osmdata
+package com.michaelsteffen.osm.rawosmdata
+
+import Point
 
 // TODO: Handle meridian
 final case class Bbox(min: Point, max: Point) {

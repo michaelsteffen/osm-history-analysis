@@ -47,7 +47,7 @@ class OSMDataUtilsTest extends UnitTest {
         visible = true
       )
 
-      val baseOSMObjectHistory = OSMObjectHistory(
+      val baseOSMObjectHistory = OSMObjectHistoryDEPRECATED(
         objType = "n",
         id = "n100",
         versions = List(

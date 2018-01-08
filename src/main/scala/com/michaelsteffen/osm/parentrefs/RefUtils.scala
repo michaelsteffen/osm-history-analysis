@@ -1,21 +1,21 @@
 package com.michaelsteffen.osm.parentrefs
 
 import scala.collection._
-import com.michaelsteffen.osm.osmdata._
+import com.michaelsteffen.osm.rawosmdata._
 
 object RefUtils {
   val ADD = 0
   val DELETE = 1
 
-  // iterator->iterator function
-  def generateRefChanges(objVersions: Iterator[OSMObjectVersionDEPRECATED]): Iterator[RefChange] = {
-
-    // TODO -- zip so we have lastversion members too
-    objVersions.flatMap(ver => {
-      val members = ver.children.toSet
+  // iterator->iterator transformation. see _High Performance Spark_ at p. 98
+  def generateRefChanges(objHistory: Iterator[OSMObjectVersion]): Iterator[RefChange] = {
+    val pairedObjHistory = (Iterator(None) ++ objHistory.map(Some(_))).sliding(2)
+    pairedObjHistory.flatMap((lastVersion, thisVersion) => {
+      val members = thisVersion.members.toSet ++ thisVersion.nds.toSet
+      val lastVersionMembers = lastVersion.members.toSet ++ lastVersion.nds.toSet
       val additions = members
         .diff(lastVersionMembers)
-        .map((ref) => RefChange(
+        .map((ref) => RefChange
           childID = OSMDataUtils.createID(ref.ref),
           parentID = ver.id,
           changeset = ver.changeset,
@@ -36,9 +36,9 @@ object RefUtils {
     })
   }
 
-  def coaleseRefTree (objHistory: OSMObjectHistory, changeGroup: RefChangeGroupToPropagate): OSMObjectHistory = {
-    if (changeGroup == null || changeGroup.changes.isEmpty) {
-      objHistory
+  def coaleseRefTree (refChangeHistory: Iterator[RefChange]): refHistory = {
+    if (refChangeHistory == null || refChangeHistory.isEmpty) {
+      refHistory.empty
     } else {
       // we add a None at the end of the obj versions list to allow a lookahead in the for loop below
       val objHistoryIterator = (objHistory.versions.map(Some(_)) ::: List(None)).iterator.sliding(2)

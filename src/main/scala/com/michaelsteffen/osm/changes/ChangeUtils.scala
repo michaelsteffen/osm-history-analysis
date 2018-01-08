@@ -17,7 +17,7 @@ object ChangeUtils {
   val MEMBER_ADD = 8
   val MEMBER_REMOVE = 9
 
-  def generateFirstOrderChanges(objHistory: OSMObjectHistory): ChangeResults = {
+  def generateFirstOrderChanges(objHistory: OSMObjectHistoryDEPRECATED): ChangeResults = {
     var changeResultsBuffer = ChangeResults.empty
     var priorVersion = OSMObjectVersionDEPRECATED.empty
     val id = objHistory.id
@@ -62,9 +62,9 @@ object ChangeUtils {
         .map(_.change)
     )
 
-  def generateSecondOrderChanges(history: OSMObjectHistory, changeGroup: ChangeGroupToPropagate): ChangeResults = {
+  def generateSecondOrderChanges(history: OSMObjectHistoryDEPRECATED, changeGroup: ChangeGroupToPropagate): ChangeResults = {
     @tailrec
-    def generateRecursively(history: OSMObjectHistory, changeGroup: ChangeGroupToPropagate, accumulator: ChangeResults): ChangeResults = {
+    def generateRecursively(history: OSMObjectHistoryDEPRECATED, changeGroup: ChangeGroupToPropagate, accumulator: ChangeResults): ChangeResults = {
       if (changeGroup.changes.isEmpty) {
         accumulator
       } else if (history.versions.length == 1) {

@@ -1,6 +1,7 @@
 package com.michaelsteffen.osm.changes
 
 import com.michaelsteffen.osm.osmdata._
+import com.michaelsteffen.osm.rawosmdata.{Bbox, Point}
 
 final case class Change (
   featureID: String,
