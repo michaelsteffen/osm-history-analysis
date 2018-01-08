@@ -70,7 +70,7 @@ object SparkJobs {
     // changesToSaveAndPropagate appears twice in the dependency graph. to avoid recomputing, we setup caching on each iteration
     // in trial runs, this persist made only a _very_ small difference (1%) vs recompute, but it makes the DAG much cleaner so what the heck
     // changesToSaveAndPropagate.foreach(_.persist(StorageLevel.MEMORY_AND_DISK_SER))
-    changesToPropagate(9).persist(StorageLevel.MEMORY_ONLY)
+    changesToSaveAndPropagate(9).persist(StorageLevel.MEMORY_ONLY)
 
     // BOOM! Get all the changes to save, knocking down our 10 dominoes
     val changes =
