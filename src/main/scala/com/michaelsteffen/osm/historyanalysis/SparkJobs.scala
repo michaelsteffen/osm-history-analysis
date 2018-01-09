@@ -14,25 +14,26 @@ object SparkJobs {
     val DEPTH = 10
 
     val RefChanges = spark.read.orc(rawHistoryLocation)
-      .as[RawOSMObjectVersion]
+      .as[ObjectVersion]
       .filter(o => o.`type` == "way" || o.`type` == "rel" )
-      .groupByKey(obj => OSMDataUtils.createID(obj.`type`, obj.id) //cheap shuffle b/c ORC is already sorted this way
+      //should be cheap shuffle b/c ORC is already sorted this way
+      .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
       .flatMapGroups(RefUtils.generateRefChanges)
 
-    // RefChanges.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "RefChanges.orc")
-
     val fullRefTree = RefChanges
-      .groupByKey(_.childID)                                       //expensive shuffle
-      .sortwithingroupsby(timestamp)
-      .mapGroups(RefUtils.coaleseRefTree)
+      //expensive shuffle
+      .groupByKey(_.childID)
+      .mapGroups(RefUtils.generateRefHistory)
 
-    // setup for iterative traversal of the tree . . .
+    // fullRefTree.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "RefTree.orc")
+
+    // setup for later iterative traversal of the tree . . .
     // on second pass we can look only at ways and relations, and all subsequent passes we can look only at relations
-    val waysAndRelationsRefTree = fullRefTree.filter(o => o.isWay || o.isRelation)
-    val relationsRefTree = fullRefTree.filter(o => o.isRelation)
+    val waysAndRelationsRefTree = fullRefTree.filter(o => OSMDataUtils.isWay(o.childID) || OSMDataUtils.isRelation(o.childID))
+    val relationsRefTree = fullRefTree.filter(o => OSMDataUtils.isRelation(o.childID))
     fullRefTree.persist(StorageLevel.MEMORY_ONLY)
     // ??? on this one
-    relationsRefTree.persist(StorageLevel.MEMORY_ONLY)
+    // relationsRefTree.persist(StorageLevel.MEMORY_ONLY)
 
     // initialize accumulators
     val changesToSaveAndPropagate = new Array[Dataset[ChangeResults]](DEPTH)
@@ -40,11 +41,12 @@ object SparkJobs {
 
     // iterate to propagate changes up through references up to 10 layers deep (e.g. relation->relation->relation->way->node)
     // remember -- this loop just creates the dependency graph, we don't knock down the dominoes just yet
+    // -- Refactoring done through here -- 
     for (i <- 0 until DEPTH) {
       changesToSaveAndPropagate(i) =
         if (i == 0)
           spark.read.orc(rawHistoryLocation)
-            .as[RawOSMObjectVersion]
+            .as[ObjectVersion]
             .map(ChangeUtils.generateFirstOrderChanges)
         else if (i == 1)
           waysAndRelationsRefTree

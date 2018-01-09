@@ -1,6 +1,6 @@
 package com.michaelsteffen.osm.rawosmdata
 
-final case class OSMObjectVersion(
+final case class ObjectVersion(
   id: Long,
   `type`: String, 
   tags: Map[String,Option[String]],

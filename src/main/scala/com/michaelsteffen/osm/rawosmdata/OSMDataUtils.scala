@@ -1,30 +1,29 @@
 package com.michaelsteffen.osm.rawosmdata
 
+import scala.math.pow
 import com.michaelsteffen.osm.osmdata._
 
 object OSMDataUtils {
-  def toOSMObjectHistory (id: String, rawObjHistory: Iterator[RawOSMObjectVersion]): OSMObjectHistoryDEPRECATED = OSMObjectHistory(
-    id = id,
-    objType = id(0).toString,
-    versions = rawObjHistory
-      .toList
-      .sortWith(_.timestamp.getTime < _.timestamp.getTime)
-      .map(toOSMObjectVersion)
-  )
-
+  // TODO: look into spire, which will speed up all this exponentiation
   def createID (id: Long, objType: String): Long = {
     if (id >= 2^61) throw new Exception(s"ID out of bounds: $id")
     else {
       objType match {
         case "node" => id
-        case "way" => 2^61 + id
-        case "relation" => 2^62 + id
+        case "way" => Math.pow(2,61).toLong + id
+        case "relation" => Math.pow(2,62).toLong + id
         case _ => throw new Exception(s"Unknown object type: $id")
       }
     }
   }
 
-  def hasGeometry (objType: String, objVersion: OSMObjectVersion): Boolean = {
+  def isNode (id: Long): Boolean = id < Math.pow(2,61)
+
+  def isWay (id: Long): Boolean = id >= Math.pow(2,61) && id < Math.pow(2,62)
+
+  def isRelation (id: Long): Boolean = id >= Math.pow(2,62)
+
+  def hasGeometry (objType: String, objVersion: ObjectVersion): Boolean = {
     objVersion.isFeature && (objType match {
       case "n" | "w" => true
       case "r" => objVersion.tags.getOrElse("type", "").equals("multipolygon")
@@ -32,7 +31,7 @@ object OSMDataUtils {
   }
 
   // TODO: define lat/lon for nodes/relations
-  private def toOSMObjectVersion (obj: RawOSMObjectVersion): OSMObjectVersion = OSMObjectVersionDEPRECATED(
+  private def toOSMObjectVersion (obj: RawOSMObjectVersion): ObjectVersion = OSMObjectVersionDEPRECATED(
     tags = obj.tags,
     lat = obj.lat,
     lon = obj.lon,
