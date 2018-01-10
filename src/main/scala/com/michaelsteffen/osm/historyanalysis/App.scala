@@ -1,7 +1,7 @@
 package com.michaelsteffen.osm.historyanalysis
 
 import org.apache.spark.sql._
-import com.michaelsteffen.osm.rawosmdata._
+import com.michaelsteffen.osm.osmdata._
 
 object App {
   def main(args: Array[String]): Unit = {

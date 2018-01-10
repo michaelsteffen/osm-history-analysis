@@ -1,4 +1,4 @@
-package com.michaelsteffen.osm.rawosmdata
+package com.michaelsteffen.osm.osmdata
 
 import scala.math.pow
 import com.michaelsteffen.osm.osmdata._
@@ -22,13 +22,6 @@ object OSMDataUtils {
   def isWay (id: Long): Boolean = id >= Math.pow(2,61) && id < Math.pow(2,62)
 
   def isRelation (id: Long): Boolean = id >= Math.pow(2,62)
-
-  def hasGeometry (objType: String, objVersion: ObjectVersion): Boolean = {
-    objVersion.isFeature && (objType match {
-      case "n" | "w" => true
-      case "r" => objVersion.tags.getOrElse("type", "").equals("multipolygon")
-    })
-  }
 
   // TODO: define lat/lon for nodes/relations
   private def toOSMObjectVersion (obj: RawOSMObjectVersion): ObjectVersion = OSMObjectVersionDEPRECATED(

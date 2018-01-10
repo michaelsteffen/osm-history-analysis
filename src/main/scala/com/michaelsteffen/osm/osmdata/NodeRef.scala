@@ -1,4 +1,4 @@
-package com.michaelsteffen.osm.rawosmdata
+package com.michaelsteffen.osm.osmdata
 
 final case class NodeRef(
   ref: Long

@@ -1,7 +1,7 @@
 package com.michaelsteffen.osm.osmdata
 
 import com.michaelsteffen.osm.testspecs._
-import com.michaelsteffen.osm.rawosmdata._
+import com.michaelsteffen.osm.osmdata._
 import java.sql._
 
 class OSMDataUtilsTest extends UnitTest {

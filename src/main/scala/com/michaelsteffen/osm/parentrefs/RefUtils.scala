@@ -1,9 +1,7 @@
 package com.michaelsteffen.osm.parentrefs
 
 import scala.collection._
-import com.michaelsteffen.osm.rawosmdata._
-
-import scala.annotation.tailrec
+import com.michaelsteffen.osm.osmdata._
 
 object RefUtils {
   val ADD = 0
@@ -49,6 +47,7 @@ object RefUtils {
       RefHistory(childID, Array.empty[RefVersion])
     } else {
       // TODO: which direction does this end up sorted?
+      // TODO: add "hasGeometry" to each version
       val sortedRefChangeHistory = refChangeHistory.toList.sortBy(_.timestamp.getTime).toIterator
       var lastVersionRefs = Set.empty[Long]
       var history = mutable.ListBuffer.empty[RefVersion]

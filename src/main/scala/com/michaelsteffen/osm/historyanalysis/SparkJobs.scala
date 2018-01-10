@@ -3,7 +3,7 @@ package com.michaelsteffen.osm.historyanalysis
 import com.michaelsteffen.osm.changes._
 import com.michaelsteffen.osm.osmdata._
 import com.michaelsteffen.osm.parentrefs._
-import com.michaelsteffen.osm.rawosmdata._
+import com.michaelsteffen.osm.osmdata._
 import org.apache.spark.sql._
 import org.apache.spark.storage.StorageLevel
 
@@ -16,7 +16,7 @@ object SparkJobs {
     val RefChanges = spark.read.orc(rawHistoryLocation)
       .as[ObjectVersion]
       .filter(o => o.`type` == "way" || o.`type` == "rel" )
-      //should be cheap shuffle b/c ORC is already sorted this way
+      //should be cheap shuffle b/c ORC should already be sorted this way?
       .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
       .flatMapGroups(RefUtils.generateRefChanges)
 
@@ -29,8 +29,8 @@ object SparkJobs {
 
     // setup for later iterative traversal of the tree . . .
     // on second pass we can look only at ways and relations, and all subsequent passes we can look only at relations
-    val waysAndRelationsRefTree = fullRefTree.filter(o => OSMDataUtils.isWay(o.childID) || OSMDataUtils.isRelation(o.childID))
-    val relationsRefTree = fullRefTree.filter(o => OSMDataUtils.isRelation(o.childID))
+    val waysAndRelationsRefTree = fullRefTree.filter(o => OSMDataUtils.isWay(o.id) || OSMDataUtils.isRelation(o.id))
+    val relationsRefTree = fullRefTree.filter(o => OSMDataUtils.isRelation(o.id))
     fullRefTree.persist(StorageLevel.MEMORY_ONLY)
     // ??? on this one
     // relationsRefTree.persist(StorageLevel.MEMORY_ONLY)
@@ -40,18 +40,19 @@ object SparkJobs {
     val changesToPropagate = new Array[Dataset[ChangeGroupToPropagate]](DEPTH)
 
     // iterate to propagate changes up through references up to 10 layers deep (e.g. relation->relation->relation->way->node)
-    // remember -- this loop just creates the dependency graph, we don't knock down the dominoes just yet
-    // -- Refactoring done through here -- 
+    // this loop just creates the dependency graph, we don't knock down the dominoes just yet
+    // -- Refactoring done through here --
     for (i <- 0 until DEPTH) {
       changesToSaveAndPropagate(i) =
         if (i == 0)
           spark.read.orc(rawHistoryLocation)
             .as[ObjectVersion]
-            .map(ChangeUtils.generateFirstOrderChanges)
+            .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
+            .mapGroups(ChangeUtils.generateFirstOrderChanges)
         else if (i == 1)
           waysAndRelationsRefTree
-          .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
+            .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
+            .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
         else
           relationsRefTree
             .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
@@ -60,7 +61,7 @@ object SparkJobs {
       changesToPropagate(i) = changesToSaveAndPropagate(i)
         .flatMap(_.changesToPropagate)
         .groupByKey(_.parentID)
-        .mapGroups(ChangeUtils.collectChangesToPropagate)
+        .mapGroups((id: Long, changes: Iterator[ChangeToPropagate]) => ChangeGroupToPropagate(id, changes.map(_.change)))
     }
 
     // flag to hold onto this one so we don't have to generate it twice. should be empty or close to it
@@ -74,7 +75,7 @@ object SparkJobs {
       .groupByKey(_.featureID)
       .flatMapGroups((id, changes) => ChangeUtils.coalesceChanges(changes))
 
-    // And . . . BOOM! Save all the changes, the first action, finally triggering our long chain of dominoes
+    // And . . . BOOM. Save all the changes, the first action, finally triggering our long chain of dominoes
     changes.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "changes.orc")
 
     // save any residual changesToPropagate so we can see what (if any) failed to resolve after 10 iterations

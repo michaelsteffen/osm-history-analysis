@@ -1,24 +1,21 @@
 package com.michaelsteffen.osm.changes
 
 import com.michaelsteffen.osm.osmdata._
-import com.michaelsteffen.osm.rawosmdata.{Bbox, Point}
 
 final case class Change (
-  featureID: String,
+  featureID: Long,
   changeType: Int,
   count: Int,
-  version: Long,    // version after the change
   tagsBefore: Map[String, Option[String]],
   tagChanges: Map[String, Option[String]],
   bbox: Option[Bbox],
   timestamp: java.sql.Timestamp,
   changeset: Long
 ) {
-  def this(id: String, changeType: Int, count: Int, after: OSMObjectVersionDEPRECATED) = this(
+  def this(id: Long, changeType: Int, count: Int, after: ObjectVersion) = this(
     featureID = id,
     changeType = changeType,
     count = count,
-    version = after.majorVersion,
     tagsBefore =
       if (changeType == ChangeUtils.FEATURE_CREATE) Map.empty[String,Option[String]]
       else after.tags,
@@ -30,11 +27,10 @@ final case class Change (
     changeset = after.changeset
   )
 
-  def this(id: String, changeType: Int, count: Int, before: OSMObjectVersionDEPRECATED, after: OSMObjectVersionDEPRECATED, tagChanges: Map[String, Option[String]]) = this(
+  def this(id: Long, changeType: Int, count: Int, before: ObjectVersion, after: ObjectVersion, tagChanges: Map[String, Option[String]]) = this(
     featureID = id,
     changeType = changeType,
     count = count,
-    version = after.majorVersion,
     tagsBefore = before.tags,
     tagChanges = tagChanges,
     bbox = Change.lonLatToBbox(after.lon, after.lat),
@@ -44,10 +40,10 @@ final case class Change (
 }
 
 object Change {
-  def nonTagChange(id: String, changeType: Int, count: Int, after: OSMObjectVersionDEPRECATED) =
+  def nonTagChange(id: Long, changeType: Int, count: Int, after: ObjectVersion) =
     new Change(id, changeType, count, after)
 
-  def tagChange(id: String, changeType: Int, count: Int, before: OSMObjectVersionDEPRECATED, after: OSMObjectVersionDEPRECATED, tagChanges: Map[String, Option[String]]) =
+  def tagChange(id: Long, changeType: Int, count: Int, before: ObjectVersion, after: ObjectVersion, tagChanges: Map[String, Option[String]]) =
     new Change(id, changeType, count, before, after, tagChanges)
 
   def lonLatToBbox(lon: Option[BigDecimal], lat: Option[BigDecimal]): Option[Bbox] = {

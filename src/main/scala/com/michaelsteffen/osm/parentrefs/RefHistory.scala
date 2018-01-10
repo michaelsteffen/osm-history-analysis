@@ -1,6 +1,7 @@
 package com.michaelsteffen.osm.parentrefs
 
 case class RefHistory(
-  childID: Long,
+  id: Long,
+  hasGeometry: Boolean,
   versions: Array[RefVersion]
 )
