@@ -20,51 +20,52 @@ object SparkJobs {
       .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
       .flatMapGroups(RefUtils.generateRefChanges)
 
-    val fullRefTree = RefChanges
+    val refTree = RefChanges
       //expensive shuffle
       .groupByKey(_.childID)
       .mapGroups(RefUtils.generateRefHistory)
-      .repartition($"id")
 
-    // fullRefTree.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "RefTree.orc")
+    // refTree.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "RefTree.orc")
 
     // setup for later iterative traversal of the tree . . .
     // on second pass we can look only at ways and relations, and all subsequent passes we can look only at relations
-    // val waysAndRelationsRefTree = fullRefTree.filter(o => OSMDataUtils.isWay(o.id) || OSMDataUtils.isRelation(o.id))
-    // val relationsRefTree = fullRefTree.filter(o => OSMDataUtils.isRelation(o.id))
-    fullRefTree.persist(StorageLevel.MEMORY_ONLY)
-
-    // this GroupBy doesn't do anything since id is unique, but gets us a KeyValueGeoupedDataset we can use below
-    // it should be fast since the repartition above tells spark that we're already partitioned on id
-    val keyValueRefTree = fullRefTree.groupByKey(_.id)
-
+    val waysAndRelationsRefTree = refTree.filter(o => OSMDataUtils.isWay(o.id) || OSMDataUtils.isRelation(o.id))
+    val relationsRefTree = refTree.filter(o => OSMDataUtils.isRelation(o.id))
+    refTree.persist(StorageLevel.MEMORY_ONLY)
     // ??? on this one
-    // relationsRefTree.persist(StorageLevel.MEMORY_ONLY)
+    relationsRefTree.persist(StorageLevel.MEMORY_ONLY)
 
     // initialize accumulators
     val changesToSaveAndPropagate = new Array[Dataset[ChangeResults]](DEPTH)
-    val changesToPropagate = new Array[Dataset[ChangeToPropagate]](DEPTH)
-    val groupedChangesToPropagate = new Array[KeyValueGroupedDataset[Long, ChangeToPropagate]](DEPTH)
+    val changesToPropagate = new Array[Dataset[ChangeGroupToPropagate]](DEPTH)
 
     // iterate to propagate changes up through references up to 10 layers deep (e.g. relation->relation->relation->way->node)
     // this loop just creates the dependency graph, we don't knock down the dominoes just yet
     // -- Refactoring done through here --
     for (i <- 0 until DEPTH) {
       changesToSaveAndPropagate(i) =
-        if (i == 0)
-          spark.read.orc(rawHistoryLocation)
-            .as[ObjectVersion]
-            .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
-            .cogroup(keyValueRefTree, ChangeUtils.generateFirstOrderChanges)
-        else
-          keyValueRefTree.cogroup(groupedChangesToPropagate(i-1), ChangeUtils.generateSecondOrderChanges)
+        if (i == 0) spark.read.orc(rawHistoryLocation)
+          .as[ObjectVersion]
+          .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
+          .mapGroups(ChangeUtils.generateFirstOrderChanges)
+        else if (i == 1) refTree
+          .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
+          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
+        else if (i == 2) waysAndRelationsRefTree
+          .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
+          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
+        else relationsRefTree
+          .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
+          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
 
-      changesToPropagate(i) = changesToSaveAndPropagate(i).flatMap(_.changesToPropagate)
-      groupedChangesToPropagate(i) = changesToPropagate(i).groupByKey(_.parentID)
+      changesToPropagate(i) = changesToSaveAndPropagate(i)
+        .flatMap(_.changesToPropagate)
+        .groupByKey(_.parentID)
+        .mapGroups((id: Long, changes: Iterator[ChangeToPropagate]) => ChangeGroupToPropagate(id, changes.map(_.change)))
     }
 
     // flag to hold onto this one so we don't have to generate it twice. should be empty or close to it
-    changesToPropagate(9).persist(StorageLevel.MEMORY_ONLY)
+    changesToPropagate(DEPTH-1).persist(StorageLevel.MEMORY_ONLY)
 
     // Almost ready . . .
     val changes =
@@ -78,6 +79,6 @@ object SparkJobs {
     changes.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "changes.orc")
 
     // save any residual changesToPropagate so we can see what (if any) failed to resolve after 10 iterations
-    changesToPropagate(9).write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "residualChangesToPropagate.orc")
+    changesToPropagate(DEPTH-1).write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "residualChangesToPropagate.orc")
   }
 }

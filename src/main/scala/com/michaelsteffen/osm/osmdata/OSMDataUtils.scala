@@ -22,13 +22,4 @@ object OSMDataUtils {
   def isWay (id: Long): Boolean = id >= Math.pow(2,61) && id < Math.pow(2,62)
 
   def isRelation (id: Long): Boolean = id >= Math.pow(2,62)
-
-  // TODO: define lat/lon for nodes/relations
-
-  private def convertRefs (nodeRefs: List[RawNodeRef], memberRefs: List[RawMemberRef]): List[Ref] = {
-    val newNodeRefs = nodeRefs.map(n => Ref(createID(n.ref, "node"), ""))
-    val newMemberRefs = memberRefs.map(m => Ref(createID(m.ref, m.`type`), m.role))
-
-    newNodeRefs ++ newMemberRefs
-  }
 }

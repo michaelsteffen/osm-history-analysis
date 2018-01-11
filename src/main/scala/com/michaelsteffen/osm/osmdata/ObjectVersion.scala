@@ -23,6 +23,12 @@ final case class ObjectVersion(
       case "relation" => this.tags.getOrElse("type", "").equals("multipolygon")
     })
   }
+
+  def children: List[MemberRef] = this.`type` match {
+    case "node" => List.empty[MemberRef]
+    case "way" => this.nds.map(_.toMember)
+    case "relation" => this.members
+  }
 }
 
 object ObjectVersion {

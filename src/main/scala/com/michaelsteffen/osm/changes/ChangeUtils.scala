@@ -141,12 +141,13 @@ object ChangeUtils {
     ) else ChangeResults.empty
   }
 
+  // the changes below can propagate, but on the first iteration we just "propagate" them to ourselves
   private def nodeMoves(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
-    if (id(0) == 'n' && (objVersion.lat, objVersion.lon) != (priorVersion.lat, priorVersion.lon)) {
+    if (OSMDataUtils.isNode(id) && (objVersion.lat, objVersion.lon) != (priorVersion.lat, priorVersion.lon)) {
       val change = Change.nonTagChange(id, NODE_MOVE, 1, objVersion)
       ChangeResults(
         changesToSave = Iterator(change),
-        changesToPropagate = objVersion.parents.map(ChangeToPropagate(_, change))
+        changesToPropagate = Iterator(ChangeToPropagate(id, change))
       )
     } else {
       ChangeResults.empty
@@ -154,28 +155,28 @@ object ChangeUtils {
   }
 
   private def nodeAndMemberAdditions(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
-    if (id(0) == 'w' || id(0) == 'r') {
+    if (OSMDataUtils.isWay(id) || OSMDataUtils.isRelation(id)) {
       val newMembersCount = objVersion.children.toSet.diff(priorVersion.children.toSet).size
-      val changeType = if (id(0) == 'w') NODE_ADD else MEMBER_ADD
+      val changeType = if (OSMDataUtils.isWay(id)) NODE_ADD else MEMBER_ADD
       if (newMembersCount > 0) {
         val change = Change.nonTagChange(id, changeType, newMembersCount, objVersion)
         ChangeResults(
           changesToSave = Iterator(change),
-          changesToPropagate = objVersion.parents.map(ChangeToPropagate(_, change))
+          changesToPropagate = Iterator(ChangeToPropagate(id, change))
         )
       } else ChangeResults.empty
     } else ChangeResults.empty
   }
 
   private def nodeAndMemberRemovals(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
-    if (id(0) == 'w' || id(0) == 'r') {
+    if (OSMDataUtils.isWay(id) || OSMDataUtils.isRelation(id)) {
       val removedMembersCount = priorVersion.children.toSet.diff(objVersion.children.toSet).size
-      val changeType = if (id(0) == 'w') NODE_REMOVE else MEMBER_REMOVE
+      val changeType = if (OSMDataUtils.isWay(id)) NODE_REMOVE else MEMBER_REMOVE
       if (removedMembersCount > 0) {
         val change = Change.nonTagChange(id, changeType, removedMembersCount, objVersion)
         ChangeResults(
-          changesToSave = List(change),
-          changesToPropagate = objVersion.parents.map(ChangeToPropagate(_, change))
+          changesToSave = Iterator(change),
+          changesToPropagate = Iterator(ChangeToPropagate(id, change))
         )
       } else ChangeResults.empty
     } else ChangeResults.empty

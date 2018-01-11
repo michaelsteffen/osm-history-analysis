@@ -13,12 +13,8 @@ object RefUtils {
     pairedObjHistory.flatMap(p => {
       val lastVersion = p.head
       val thisVersion = p(1).get
-      val children =
-        thisVersion.members.toSet ++
-        thisVersion.nds.map(_.toMember).toSet
-      val lastVersionChildren =
-        lastVersion.flatMap(_.members).toSet ++
-        lastVersion.flatMap(_.nds.map(_.toMember)).toSet
+      val children = thisVersion.children.toSet
+      val lastVersionChildren = lastVersion.flatMap(_.children).toSet
       val additions = children
         .diff(lastVersionChildren)
         .map(ref => RefChange(
