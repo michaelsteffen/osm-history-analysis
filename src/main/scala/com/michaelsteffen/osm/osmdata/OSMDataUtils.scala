@@ -24,18 +24,6 @@ object OSMDataUtils {
   def isRelation (id: Long): Boolean = id >= Math.pow(2,62)
 
   // TODO: define lat/lon for nodes/relations
-  private def toOSMObjectVersion (obj: RawOSMObjectVersion): ObjectVersion = OSMObjectVersionDEPRECATED(
-    tags = obj.tags,
-    lat = obj.lat,
-    lon = obj.lon,
-    children = convertRefs(obj.nds, obj.members),
-    parents = List.empty[String],
-    majorVersion = obj.version,
-    minorVersion = 0,
-    changeset = obj.changeset,
-    timestamp = obj.timestamp,
-    visible = obj.visible
-  )
 
   private def convertRefs (nodeRefs: List[RawNodeRef], memberRefs: List[RawMemberRef]): List[Ref] = {
     val newNodeRefs = nodeRefs.map(n => Ref(createID(n.ref, "node"), ""))

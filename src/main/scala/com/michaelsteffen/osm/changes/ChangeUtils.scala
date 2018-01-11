@@ -72,7 +72,7 @@ object ChangeUtils {
 
         val thisVersionChanges = changeGroup.changes
           .takeWhile(_.timestamp.getTime < nextVersion.timestamp.getTime)
-          .map(c => Change.nonTagChange(history.id, c.changeType, c.count, thisVersion))
+          .map(_.copy(featureID = history.id))
         val changeResults = ChangeResults(
           changesToSave = if (thisVersion.hasGeometry) thisVersionChanges else Iterator.empty[Change],
           changesToPropagate = thisVersionChanges.flatMap(c => thisVersion.parents.map(p => ChangeToPropagate(p, c)))
@@ -104,31 +104,31 @@ object ChangeUtils {
 
   private def featureCreation(id: Long, objVersion: ObjectVersion): ChangeResults = {
     ChangeResults(
-      changesToSave = List(Change.nonTagChange(id, FEATURE_CREATE, 1, objVersion)),
-      changesToPropagate = List.empty[ChangeToPropagate]
+      changesToSave = Iterator(Change.nonTagChange(id, FEATURE_CREATE, 1, objVersion)),
+      changesToPropagate = Iterator.empty[ChangeToPropagate]
     )
   }
 
   private def featureDeletion(id: Long, objVersion: ObjectVersion): ChangeResults = {
     ChangeResults(
-      changesToSave = List(Change.nonTagChange(id, FEATURE_DELETE, 1, objVersion)),
-      changesToPropagate = List.empty[ChangeToPropagate]
+      changesToSave = Iterator(Change.nonTagChange(id, FEATURE_DELETE, 1, objVersion)),
+      changesToPropagate = Iterator.empty[ChangeToPropagate]
     )
   }
 
   private def tagAdditions(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
     val newKeys = objVersion.tags.keys.toSet.diff(priorVersion.tags.keys.toSet)
     if (newKeys.nonEmpty) ChangeResults(
-      changesToSave = List(Change.tagChange(id, TAG_ADD, newKeys.size, priorVersion, objVersion, objVersion.tags.filterKeys(newKeys))),
-      changesToPropagate = List.empty[ChangeToPropagate]
+      changesToSave = Iterator(Change.tagChange(id, TAG_ADD, newKeys.size, priorVersion, objVersion, objVersion.tags.filterKeys(newKeys))),
+      changesToPropagate = Iterator.empty[ChangeToPropagate]
     ) else ChangeResults.empty
   }
 
   private def tagDeletions(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
     val deletedKeys = priorVersion.tags.keys.toSet.diff(objVersion.tags.keys.toSet)
     if (deletedKeys.nonEmpty) ChangeResults(
-      changesToSave = List(Change.tagChange(id, TAG_DELETE, deletedKeys.size, priorVersion, objVersion, priorVersion.tags.filterKeys(deletedKeys))),
-      changesToPropagate = List.empty[ChangeToPropagate]
+      changesToSave = Iterator(Change.tagChange(id, TAG_DELETE, deletedKeys.size, priorVersion, objVersion, priorVersion.tags.filterKeys(deletedKeys))),
+      changesToPropagate = Iterator.empty[ChangeToPropagate]
     ) else ChangeResults.empty
   }
 
@@ -136,8 +136,8 @@ object ChangeUtils {
     val sharedKeys = objVersion.tags.keySet.intersect(priorVersion.tags.keySet)
     val keysWithChanges = sharedKeys.filter(key => objVersion.tags(key) != priorVersion.tags(key))
     if (keysWithChanges.nonEmpty) ChangeResults(
-      changesToSave = List(Change.tagChange(id, TAG_CHANGE, keysWithChanges.size, priorVersion, objVersion, objVersion.tags.filterKeys(keysWithChanges))),
-      changesToPropagate = List.empty[ChangeToPropagate]
+      changesToSave = Iterator(Change.tagChange(id, TAG_CHANGE, keysWithChanges.size, priorVersion, objVersion, objVersion.tags.filterKeys(keysWithChanges))),
+      changesToPropagate = Iterator.empty[ChangeToPropagate]
     ) else ChangeResults.empty
   }
 
@@ -145,7 +145,7 @@ object ChangeUtils {
     if (id(0) == 'n' && (objVersion.lat, objVersion.lon) != (priorVersion.lat, priorVersion.lon)) {
       val change = Change.nonTagChange(id, NODE_MOVE, 1, objVersion)
       ChangeResults(
-        changesToSave = List(change),
+        changesToSave = Iterator(change),
         changesToPropagate = objVersion.parents.map(ChangeToPropagate(_, change))
       )
     } else {
@@ -160,7 +160,7 @@ object ChangeUtils {
       if (newMembersCount > 0) {
         val change = Change.nonTagChange(id, changeType, newMembersCount, objVersion)
         ChangeResults(
-          changesToSave = List(change),
+          changesToSave = Iterator(change),
           changesToPropagate = objVersion.parents.map(ChangeToPropagate(_, change))
         )
       } else ChangeResults.empty

@@ -24,20 +24,27 @@ object SparkJobs {
       //expensive shuffle
       .groupByKey(_.childID)
       .mapGroups(RefUtils.generateRefHistory)
+      .repartition($"id")
 
     // fullRefTree.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "RefTree.orc")
 
     // setup for later iterative traversal of the tree . . .
     // on second pass we can look only at ways and relations, and all subsequent passes we can look only at relations
-    val waysAndRelationsRefTree = fullRefTree.filter(o => OSMDataUtils.isWay(o.id) || OSMDataUtils.isRelation(o.id))
-    val relationsRefTree = fullRefTree.filter(o => OSMDataUtils.isRelation(o.id))
+    // val waysAndRelationsRefTree = fullRefTree.filter(o => OSMDataUtils.isWay(o.id) || OSMDataUtils.isRelation(o.id))
+    // val relationsRefTree = fullRefTree.filter(o => OSMDataUtils.isRelation(o.id))
     fullRefTree.persist(StorageLevel.MEMORY_ONLY)
+
+    // this GroupBy doesn't do anything since id is unique, but gets us a KeyValueGeoupedDataset we can use below
+    // it should be fast since the repartition above tells spark that we're already partitioned on id
+    val keyValueRefTree = fullRefTree.groupByKey(_.id)
+
     // ??? on this one
     // relationsRefTree.persist(StorageLevel.MEMORY_ONLY)
 
     // initialize accumulators
     val changesToSaveAndPropagate = new Array[Dataset[ChangeResults]](DEPTH)
-    val changesToPropagate = new Array[Dataset[ChangeGroupToPropagate]](DEPTH)
+    val changesToPropagate = new Array[Dataset[ChangeToPropagate]](DEPTH)
+    val groupedChangesToPropagate = new Array[KeyValueGroupedDataset[Long, ChangeToPropagate]](DEPTH)
 
     // iterate to propagate changes up through references up to 10 layers deep (e.g. relation->relation->relation->way->node)
     // this loop just creates the dependency graph, we don't knock down the dominoes just yet
@@ -48,20 +55,12 @@ object SparkJobs {
           spark.read.orc(rawHistoryLocation)
             .as[ObjectVersion]
             .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
-            .mapGroups(ChangeUtils.generateFirstOrderChanges)
-        else if (i == 1)
-          waysAndRelationsRefTree
-            .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-            .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
+            .cogroup(keyValueRefTree, ChangeUtils.generateFirstOrderChanges)
         else
-          relationsRefTree
-            .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-            .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
+          keyValueRefTree.cogroup(groupedChangesToPropagate(i-1), ChangeUtils.generateSecondOrderChanges)
 
-      changesToPropagate(i) = changesToSaveAndPropagate(i)
-        .flatMap(_.changesToPropagate)
-        .groupByKey(_.parentID)
-        .mapGroups((id: Long, changes: Iterator[ChangeToPropagate]) => ChangeGroupToPropagate(id, changes.map(_.change)))
+      changesToPropagate(i) = changesToSaveAndPropagate(i).flatMap(_.changesToPropagate)
+      groupedChangesToPropagate(i) = changesToPropagate(i).groupByKey(_.parentID)
     }
 
     // flag to hold onto this one so we don't have to generate it twice. should be empty or close to it
@@ -75,7 +74,7 @@ object SparkJobs {
       .groupByKey(_.featureID)
       .flatMapGroups((id, changes) => ChangeUtils.coalesceChanges(changes))
 
-    // And . . . BOOM. Save all the changes, the first action, finally triggering our long chain of dominoes
+    // And . . . finally! Save all the changes, triggering our long chain of dominoes
     changes.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "changes.orc")
 
     // save any residual changesToPropagate so we can see what (if any) failed to resolve after 10 iterations
