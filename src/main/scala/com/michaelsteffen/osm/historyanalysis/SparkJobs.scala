@@ -55,13 +55,13 @@ object SparkJobs {
         else if (i == 1) refTree
           // TODO: we're now going to double-save changes on the first pass
           .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
+          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i))
         else if (i == 2) waysAndRelationsRefTree
           .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
+          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i))
         else relationsRefTree
           .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2))
+          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i))
 
       if (debugMode && i == 0) changesToSaveAndPropagate(0).flatMap(_.changesToSave).show(100)
 

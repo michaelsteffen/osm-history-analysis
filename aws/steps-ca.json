@@ -6,8 +6,8 @@
     "Args": [
       "--class", "com.michaelsteffen.osm.historyanalysis.App",
       "s3://osm-history/osm-history-analysis.jar",
-      "s3://osm-history/us-west.osh.orc",
-      "s3://osm-history/us-west-history/"
+      "s3://osm-history/california.osh.orc",
+      "s3://osm-history/california-history/"
     ]
   }
 ]

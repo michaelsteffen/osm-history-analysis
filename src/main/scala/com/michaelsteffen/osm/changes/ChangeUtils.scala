@@ -53,14 +53,14 @@ object ChangeUtils {
     changeResultsBuffer
   }
 
-  def generateSecondOrderChanges(history: RefHistory, changeGroup: ChangeGroupToPropagate): ChangeResults = {
+  def generateSecondOrderChanges(history: RefHistory, changeGroup: ChangeGroupToPropagate, depth: Int): ChangeResults = {
     @tailrec
     def generateRecursively(history: RefHistory, changeGroup: ChangeGroupToPropagate, accumulator: ChangeResults): ChangeResults = {
       if (changeGroup.changes.isEmpty) {
         accumulator
       } else if (history.versions.length == 1) {
         val thisVersion = history.versions.head
-        val thisVersionChanges = changeGroup.changes.map(_.copy(featureID = history.id))
+        val thisVersionChanges = changeGroup.changes.map(_.copy(featureID = history.id, depth = depth))
         val changeResults = ChangeResults(
           changesToSave = if (thisVersion.wayOrRelationHasGeometry) thisVersionChanges else Array.empty[Change],
           changesToPropagate = thisVersionChanges.flatMap(c => thisVersion.parents.map(p => ChangeToPropagate(p, c)))
@@ -72,7 +72,7 @@ object ChangeUtils {
 
         val thisVersionChanges = changeGroup.changes
           .takeWhile(_.timestamp.getTime < nextVersion.timestamp.getTime)
-          .map(_.copy(featureID = history.id))
+          .map(_.copy(featureID = history.id, depth = depth))
         val changeResults = ChangeResults(
           changesToSave = if (thisVersion.wayOrRelationHasGeometry) thisVersionChanges else Array.empty[Change],
           changesToPropagate = thisVersionChanges.flatMap(c => thisVersion.parents.map(p => ChangeToPropagate(p, c)))
