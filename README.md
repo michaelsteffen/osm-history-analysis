@@ -1,6 +1,8 @@
-Generate easily queryable OpenStreetMap change histories using Spark. Process the entire global history of OpenStreetMap -- XXX changes -- in 24 hours for under $50.
+[Work in Progress]
 
-Uses OpenStreetMap ORC files generated with [osm2orc](https://github.com/mojodna/osm2orc). This repo includes ORC-formatted data for Washington, DC to get you started. When you're ready to go global, you can use the planet history file [hosted by AWS](https://aws.amazon.com/public-datasets/osm/). 
+Generate easily queryable OpenStreetMap change histories using Spark. Process the entire global history of OpenStreetMap -- [[10 billion edits]] -- in 6 hours for under $20, on AWS ElasticMapReduce.
+
+Uses OpenStreetMap ORC files generated with [osm2orc](https://github.com/mojodna/osm2orc). This repo includes ORC-formatted data for Washington, DC to help you test your build locally. When you're ready to go global, you can use the planet history file [hosted by AWS](https://aws.amazon.com/public-datasets/osm/). 
 
 ## Building
 
@@ -12,7 +14,7 @@ sbt assembly
 
 ## Running and querying locally 
 
-Requires Spark 2.2.0
+Requires Spark 2.2.0+
 
 ### Generating change data
 ```
@@ -22,7 +24,7 @@ spark-submit \
  --driver-memory 50g \
  target/scala-2.11/osm-history-analysis.jar \
  data/district-of-columbia.osh.orc \
- path/to/output.orc
+ path/to/output/
 ```
 
 ### Querying in spark-shell
@@ -57,9 +59,12 @@ changes
 
 ## Running on AWS ElasticMapReduce and querying in AWS Athena
 
-Requires the AWS [cli](https://aws.amazon.com/cli/).
+Now for the fun part. Requires the AWS [cli](https://aws.amazon.com/cli/).
 
 ### Generating change files
+
+_This script doesn't exist yet_
+
 ```
 ./emr-run.sh
 ```
@@ -154,7 +159,7 @@ ORDER BY count(*) DESC
 I've included configurations for 3 different recommended cluster sizes in [./aws](/aws). All configurations run on Spot instances, with a bid at the On Demand price. Intermediate checkpointing to S3 to deal with lost Spot instances is a work in progress. I've had no issues with Spot interruptions, but if you're worried about it you can switch to On Demand instances.
 
 - Small -- Able to process an ORC of ~250 MB (e.g., medium US state) in ~30 minutes. Approx. $0.20-$0.40/hr depending on Spot prices.
-- Large -- 10x compute, 20x memory, 200x disk vs small. Able to process the planet history in about [[24]] hours. Approx. $1.60-$3.20/hr depending on Spot prices.
+- Large -- 20x compute, 40x memory, 200x disk vs small. Able to process the planet history in about [[6]] hours. Approx. $3.20-$6.40/hr depending on Spot prices.
 - X-Large -- 4x or more compute (depending on how AWS meets instance-fleet requests), 4x memory, 1x disk vs large. Able to process the planet history in about [[8]] hours. Approx. [[XX]]/hr depending on Spot prices.
 
 ## More on data output 

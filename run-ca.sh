@@ -10,18 +10,18 @@ if sbt assembly; then
 
     echo "Creating cluster..."
     aws emr create-cluster \
-      --name "OSM History Analysis Cluster (Il) (no-residuals) (ref-tree)" \
-      --tags "job=osm-history-il" \
+      --name "OSM History Analysis Cluster (CA)" \
+      --tags "job=osm-history-usw" \
       --region us-east-1 \
       --ec2-attributes SubnetId=subnet-c84fda83,KeyName=OSMHistoryKey \
       --instance-groups file://./aws/instanceGroups-sm.json \
-      --log-uri s3://osm-history/logs/illinois/ \
+      --log-uri s3://osm-history/logs/ca/ \
       --use-default-roles \
       --configurations file://./aws/emrConfig-sm.json \
       --visible-to-all-users \
       --applications Name="Spark" Name="Ganglia" \
       --release-label emr-5.11.0 \
-      --steps file://./aws/steps-il.json \
+      --steps file://./aws/steps-ca.json \
       --auto-terminate
 else
     echo "Build failed. Aborting cluster creation."

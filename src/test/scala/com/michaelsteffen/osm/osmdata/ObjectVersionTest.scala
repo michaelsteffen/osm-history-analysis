@@ -4,7 +4,7 @@ import java.sql.Timestamp
 import com.michaelsteffen.osm.testspecs._
 
 class ObjectVersionTest extends UnitTest {
-  describe("An OSMObjectVersion") {
+  /* describe("An OSMObjectVersion") {
     val baseVersion =  OSMObjectVersionDEPRECATED(
       majorVersion = 1,
       minorVersion = 0,
@@ -48,6 +48,6 @@ class ObjectVersionTest extends UnitTest {
         assert(v.isFeature === true)
       }
     }
-  }
+  } */
 }
 

@@ -1,18 +1,18 @@
 package com.michaelsteffen.osm.osmdata
 
 final case class ObjectVersion(
-  id: Long,
+  id: BigInt,
   `type`: String, 
   tags: Map[String,Option[String]],
   lat: Option[BigDecimal],
   lon: Option[BigDecimal],
   nds: List[NodeRef],
   members: List[MemberRef],
-  changeset: Long,
+  changeset: BigInt,
   timestamp: java.sql.Timestamp,
-  uid: Long,
+  uid: BigInt,
   user: String,
-  version: Long,
+  version: BigInt,
   visible: Boolean
 ) {
   def isFeature: Boolean = !(this.tags.isEmpty || this.tags == Map("type" -> Some("multipolygon")))
@@ -21,11 +21,12 @@ final case class ObjectVersion(
     this.isFeature && (this.`type` match {
       case "node" | "way" => true
       case "relation" => this.tags.getOrElse("type", "").equals("multipolygon")
+      case "" => false
     })
   }
 
   def children: List[MemberRef] = this.`type` match {
-    case "node" => List.empty[MemberRef]
+    case "" | "node" => List.empty[MemberRef]
     case "way" => this.nds.map(_.toMember)
     case "relation" => this.members
   }

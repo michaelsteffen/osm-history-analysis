@@ -24,7 +24,7 @@ final case class Change (
       else Map.empty[String,Option[String]],
     bbox = Change.lonLatToBbox(after.lon, after.lat),
     timestamp = after.timestamp,
-    changeset = after.changeset
+    changeset = after.changeset.toLong
   )
 
   def this(id: Long, changeType: Int, count: Int, before: ObjectVersion, after: ObjectVersion, tagChanges: Map[String, Option[String]]) = this(
@@ -35,7 +35,7 @@ final case class Change (
     tagChanges = tagChanges,
     bbox = Change.lonLatToBbox(after.lon, after.lat),
     timestamp = after.timestamp,
-    changeset = after.changeset
+    changeset = after.changeset.toLong
   )
 }
 

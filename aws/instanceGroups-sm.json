@@ -18,7 +18,7 @@
         {
           "VolumeSpecification": {
             "VolumeType": "gp2",
-            "SizeInGB": 50
+            "SizeInGB": 20
           },
           "VolumesPerInstance": 1
         }

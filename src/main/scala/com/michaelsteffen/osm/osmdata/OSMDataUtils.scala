@@ -1,17 +1,14 @@
 package com.michaelsteffen.osm.osmdata
 
-import scala.math.pow
-import com.michaelsteffen.osm.osmdata._
-
 object OSMDataUtils {
-  // TODO: look into spire, which will speed up all this exponentiation
-  def createID (id: Long, objType: String): Long = {
-    if (id >= 2^61) throw new Exception(s"ID out of bounds: $id")
+  // TODO: look into spire, which should speed up all this exponentiation
+  def createID (id: BigInt, objType: String): Long = {
+    if (id >= BigInt(Math.pow(2,61).toLong)) throw new Exception(s"ID out of bounds: $id")
     else {
       objType match {
-        case "node" => id
-        case "way" => Math.pow(2,61).toLong + id
-        case "relation" => Math.pow(2,62).toLong + id
+        case "node" => id.toLong
+        case "way" => Math.pow(2,61).toLong + id.toLong
+        case "relation" => Math.pow(2,62).toLong + id.toLong
         case _ => throw new Exception(s"Unknown object type: $id")
       }
     }

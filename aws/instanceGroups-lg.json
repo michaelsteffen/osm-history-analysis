@@ -9,7 +9,7 @@
   {
     "Name": "core",
     "InstanceGroupType": "CORE",
-    "InstanceType": "r4.2xlarge",
+    "InstanceType": "r4.4xlarge",
     "InstanceCount": 5,
     "BidPrice": ".532",
     "EbsConfiguration": {
@@ -18,7 +18,7 @@
         {
           "VolumeSpecification": {
             "VolumeType": "gp2",
-            "SizeInGB": 4096
+            "SizeInGB": 2048
           },
           "VolumesPerInstance": 1
         }

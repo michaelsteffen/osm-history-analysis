@@ -1,6 +1,5 @@
 package com.michaelsteffen.osm.osmdata
 
-import com.michaelsteffen.osm.osmdata.{Bbox, Point}
 import com.michaelsteffen.osm.testspecs._
 
 class BboxTest extends UnitTest {

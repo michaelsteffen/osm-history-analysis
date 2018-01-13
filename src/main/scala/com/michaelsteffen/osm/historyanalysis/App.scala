@@ -17,32 +17,35 @@ object App {
           .getOrCreate()
         import spark.implicits._
 
-        // set checkpoint location
-        // spark.sparkContext.setCheckpointDir(opts("outputDataLocation") + "checkpoints")
+        // reduce Spark's logging in debug mode so we can actually see the things we're interested in
+        if (opts.debugMode) {
+          println("Setting log level to WARN.")
+          import org.apache.log4j.Logger
+          import org.apache.log4j.Level
+          Logger.getLogger("org").setLevel(Level.WARN)
+          Logger.getLogger("akka").setLevel(Level.WARN)
+        }
 
         // set parallelism based on input data size and cluster size
-        val recordCount = spark.read.orc(opts("inputDataLocation")).as[RawOSMObjectVersion].count()
+        val recordCount = spark.read.orc(opts.inputDataLocation).as[ObjectVersion].count()
         optimizeParallelism(recordCount)
 
         // do all the things
-        SparkJobs.generateChanges(opts("outputDataLocation") + "history.orc", opts("outputDataLocation"))
+        SparkJobs.generateChanges(opts.inputDataLocation, opts.outputDataLocation, opts.debugMode)
 
         spark.stop()
     }
   }
 
-  private def parseArgs(args: Array[String]): Option[Map[String, String]] = {
-    if (args.length != 2) return None
-
-    val inputDataLocation = args(0)
-    val outputDataLocation = args(1)
-
+  private def parseArgs(args: Array[String]): Option[Opts] = {
+    if (args.length < 2 || args.length > 3) return None
     //TODO: check validity of inputs
     //TODO: add trailing slash to output data location if it doesn't have it
 
-    Some(Map(
-      "inputDataLocation" -> inputDataLocation,
-      "outputDataLocation" -> outputDataLocation
+    Some(Opts(
+      inputDataLocation = args(0),
+      outputDataLocation = args(1),
+      debugMode = if (args.length == 3 && args(2) == "--debug") true else false
     ))
   }
 
@@ -57,8 +60,8 @@ object App {
 
     val numPartitions = numRecords/500000
     val spark = SparkSession.builder.getOrCreate()
-    val numExecutors = spark.conf.get("spark.executor.instances").toInt
-    val coresPerExecutor = spark.conf.get("spark.executor.cores").toInt
+    val numExecutors = spark.conf.getOption("spark.executor.instances").getOrElse("1").toInt
+    val coresPerExecutor = spark.conf.getOption("spark.executor.cores").getOrElse("2").toInt
 
     val partitions = Math.max(numPartitions, numExecutors*coresPerExecutor*4)
     spark.conf.set("spark.sql.shuffle.partitions", partitions)

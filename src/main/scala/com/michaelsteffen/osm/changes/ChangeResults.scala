@@ -1,8 +1,8 @@
 package com.michaelsteffen.osm.changes
 
 final case class ChangeResults (
-  changesToSave: Iterator[Change],
-  changesToPropagate: Iterator[ChangeToPropagate]
+  changesToSave: Array[Change],
+  changesToPropagate: Array[ChangeToPropagate]
 ) {
   def ++ (cr: ChangeResults): ChangeResults = ChangeResults(
     changesToSave = this.changesToSave ++ cr.changesToSave,
@@ -12,7 +12,7 @@ final case class ChangeResults (
 
 object ChangeResults {
   def empty: ChangeResults = ChangeResults(
-    changesToSave = Iterator.empty[Change],
-    changesToPropagate = Iterator.empty[ChangeToPropagate]
+    changesToSave = Array.empty[Change],
+    changesToPropagate = Array.empty[ChangeToPropagate]
   )
 }

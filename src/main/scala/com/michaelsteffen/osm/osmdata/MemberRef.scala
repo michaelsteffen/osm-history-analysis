@@ -1,7 +1,7 @@
 package com.michaelsteffen.osm.osmdata
 
 final case class MemberRef(
-  ref: Long,
-  `type`: String, 
+  `type`: String,
+  ref: BigInt,
   role: String
 )

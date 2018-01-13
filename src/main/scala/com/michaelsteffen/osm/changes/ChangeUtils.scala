@@ -45,7 +45,7 @@ object ChangeUtils {
           nodeAndMemberRemovals(id, objVersion, priorVersion)
         // if not a feature, keep only the results to propagate up
         if (!objVersion.isFeature)
-          changeResultsBuffer = changeResultsBuffer.copy(changesToSave = Iterator.empty[Change])
+          changeResultsBuffer = changeResultsBuffer.copy(changesToSave = Array.empty[Change])
       }
       priorVersion = objVersion
     }
@@ -62,7 +62,7 @@ object ChangeUtils {
         val thisVersion = history.versions.head
         val thisVersionChanges = changeGroup.changes.map(_.copy(featureID = history.id))
         val changeResults = ChangeResults(
-          changesToSave = if (thisVersion.hasGeometry) thisVersionChanges else Iterator.empty[Change],
+          changesToSave = if (thisVersion.wayOrRelationHasGeometry) thisVersionChanges else Array.empty[Change],
           changesToPropagate = thisVersionChanges.flatMap(c => thisVersion.parents.map(p => ChangeToPropagate(p, c)))
         )
         accumulator ++ changeResults
@@ -74,7 +74,7 @@ object ChangeUtils {
           .takeWhile(_.timestamp.getTime < nextVersion.timestamp.getTime)
           .map(_.copy(featureID = history.id))
         val changeResults = ChangeResults(
-          changesToSave = if (thisVersion.hasGeometry) thisVersionChanges else Iterator.empty[Change],
+          changesToSave = if (thisVersion.wayOrRelationHasGeometry) thisVersionChanges else Array.empty[Change],
           changesToPropagate = thisVersionChanges.flatMap(c => thisVersion.parents.map(p => ChangeToPropagate(p, c)))
         )
 
@@ -104,31 +104,31 @@ object ChangeUtils {
 
   private def featureCreation(id: Long, objVersion: ObjectVersion): ChangeResults = {
     ChangeResults(
-      changesToSave = Iterator(Change.nonTagChange(id, FEATURE_CREATE, 1, objVersion)),
-      changesToPropagate = Iterator.empty[ChangeToPropagate]
+      changesToSave = Array(Change.nonTagChange(id, FEATURE_CREATE, 1, objVersion)),
+      changesToPropagate = Array.empty[ChangeToPropagate]
     )
   }
 
   private def featureDeletion(id: Long, objVersion: ObjectVersion): ChangeResults = {
     ChangeResults(
-      changesToSave = Iterator(Change.nonTagChange(id, FEATURE_DELETE, 1, objVersion)),
-      changesToPropagate = Iterator.empty[ChangeToPropagate]
+      changesToSave = Array(Change.nonTagChange(id, FEATURE_DELETE, 1, objVersion)),
+      changesToPropagate = Array.empty[ChangeToPropagate]
     )
   }
 
   private def tagAdditions(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
     val newKeys = objVersion.tags.keys.toSet.diff(priorVersion.tags.keys.toSet)
     if (newKeys.nonEmpty) ChangeResults(
-      changesToSave = Iterator(Change.tagChange(id, TAG_ADD, newKeys.size, priorVersion, objVersion, objVersion.tags.filterKeys(newKeys))),
-      changesToPropagate = Iterator.empty[ChangeToPropagate]
+      changesToSave = Array(Change.tagChange(id, TAG_ADD, newKeys.size, priorVersion, objVersion, objVersion.tags.filterKeys(newKeys))),
+      changesToPropagate = Array.empty[ChangeToPropagate]
     ) else ChangeResults.empty
   }
 
   private def tagDeletions(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
     val deletedKeys = priorVersion.tags.keys.toSet.diff(objVersion.tags.keys.toSet)
     if (deletedKeys.nonEmpty) ChangeResults(
-      changesToSave = Iterator(Change.tagChange(id, TAG_DELETE, deletedKeys.size, priorVersion, objVersion, priorVersion.tags.filterKeys(deletedKeys))),
-      changesToPropagate = Iterator.empty[ChangeToPropagate]
+      changesToSave = Array(Change.tagChange(id, TAG_DELETE, deletedKeys.size, priorVersion, objVersion, priorVersion.tags.filterKeys(deletedKeys))),
+      changesToPropagate = Array.empty[ChangeToPropagate]
     ) else ChangeResults.empty
   }
 
@@ -136,8 +136,8 @@ object ChangeUtils {
     val sharedKeys = objVersion.tags.keySet.intersect(priorVersion.tags.keySet)
     val keysWithChanges = sharedKeys.filter(key => objVersion.tags(key) != priorVersion.tags(key))
     if (keysWithChanges.nonEmpty) ChangeResults(
-      changesToSave = Iterator(Change.tagChange(id, TAG_CHANGE, keysWithChanges.size, priorVersion, objVersion, objVersion.tags.filterKeys(keysWithChanges))),
-      changesToPropagate = Iterator.empty[ChangeToPropagate]
+      changesToSave = Array(Change.tagChange(id, TAG_CHANGE, keysWithChanges.size, priorVersion, objVersion, objVersion.tags.filterKeys(keysWithChanges))),
+      changesToPropagate = Array.empty[ChangeToPropagate]
     ) else ChangeResults.empty
   }
 
@@ -146,8 +146,8 @@ object ChangeUtils {
     if (OSMDataUtils.isNode(id) && (objVersion.lat, objVersion.lon) != (priorVersion.lat, priorVersion.lon)) {
       val change = Change.nonTagChange(id, NODE_MOVE, 1, objVersion)
       ChangeResults(
-        changesToSave = Iterator(change),
-        changesToPropagate = Iterator(ChangeToPropagate(id, change))
+        changesToSave = Array(change),
+        changesToPropagate = Array(ChangeToPropagate(id, change))
       )
     } else {
       ChangeResults.empty
@@ -161,8 +161,8 @@ object ChangeUtils {
       if (newMembersCount > 0) {
         val change = Change.nonTagChange(id, changeType, newMembersCount, objVersion)
         ChangeResults(
-          changesToSave = Iterator(change),
-          changesToPropagate = Iterator(ChangeToPropagate(id, change))
+          changesToSave = Array(change),
+          changesToPropagate = Array(ChangeToPropagate(id, change))
         )
       } else ChangeResults.empty
     } else ChangeResults.empty
@@ -175,8 +175,8 @@ object ChangeUtils {
       if (removedMembersCount > 0) {
         val change = Change.nonTagChange(id, changeType, removedMembersCount, objVersion)
         ChangeResults(
-          changesToSave = Iterator(change),
-          changesToPropagate = Iterator(ChangeToPropagate(id, change))
+          changesToSave = Array(change),
+          changesToPropagate = Array(ChangeToPropagate(id, change))
         )
       } else ChangeResults.empty
     } else ChangeResults.empty

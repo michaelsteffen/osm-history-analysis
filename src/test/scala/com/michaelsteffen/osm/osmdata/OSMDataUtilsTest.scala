@@ -5,7 +5,7 @@ import com.michaelsteffen.osm.osmdata._
 import java.sql._
 
 class OSMDataUtilsTest extends UnitTest {
-  describe("The createID method") {
+  /* describe("The createID method") {
     it("should create a correct id for a node") {
       assert(OSMDataUtils.createID(100, "node") === "n100")
     }
@@ -134,5 +134,5 @@ class OSMDataUtilsTest extends UnitTest {
         assert(converted.versions.head.children === expected)
       }
     }
-  }
+  } */
 }

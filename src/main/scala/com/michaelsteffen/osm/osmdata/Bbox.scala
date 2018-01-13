@@ -1,7 +1,5 @@
 package com.michaelsteffen.osm.osmdata
 
-import Point
-
 // TODO: Handle meridian
 final case class Bbox(min: Point, max: Point) {
   def union(other: Bbox): Bbox = Bbox(
