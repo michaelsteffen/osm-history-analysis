@@ -7,110 +7,94 @@ object RefUtils {
   val ADD = 0
   val DELETE = 1
 
-  def generateRefChangesFromObjectHistory(objHistory: OSMObjectHistory): List[RefChange] = {
-    var changesBuffer = new mutable.ListBuffer[RefChange]
-    var lastVersionMembers = new mutable.HashSet[Ref]
-
-    for (objVersion <- objHistory.versions) {
-      val members = objVersion.children.toSet
-      val additions = members
-        .diff(lastVersionMembers)
-        .map((ref) => RefChange(
-          childID = ref.ref,
-          parentID = objHistory.id,
-          changeset = objVersion.changeset,
-          timestamp = objVersion.timestamp,
+  // iterator->iterator transformations. see _High Performance Spark_ at p. 98
+  def generateRefChanges(id: Long, objHistory: Iterator[ObjectVersion]): Iterator[RefChange] = {
+    val pairedObjHistory = (Iterator(None) ++ objHistory.map(Some(_))).sliding(2)
+    pairedObjHistory.flatMap(p => {
+      val lastVersion = p.head
+      val thisVersion = p(1).get
+      val children = thisVersion.children.toSet
+      val lastVersionChildren = lastVersion match {
+        case Some(v) => v.children.toSet
+        case None => Set.empty[MemberRef]
+      }
+      val additions = children
+        .diff(lastVersionChildren)
+        .map(ref => RefChange(
+          childID = OSMDataUtils.createID(ref.ref, ref.`type`),
+          parentID = id,
+          changeset = thisVersion.changeset.toLong,
+          timestamp = thisVersion.timestamp,
           changeType = RefUtils.ADD
         ))
-      val deletions = lastVersionMembers
-        .diff(members)
-        .map((ref) => RefChange(
-          childID = ref.ref,
-          parentID = objHistory.id,
-          changeset = objVersion.changeset,
-          timestamp = objVersion.timestamp,
+      val deletions = lastVersionChildren
+        .diff(children)
+        .map(ref => RefChange(
+          childID = OSMDataUtils.createID(ref.ref, ref.`type`),
+          parentID = id,
+          changeset = thisVersion.changeset.toLong,
+          timestamp = thisVersion.timestamp,
           changeType = RefUtils.DELETE
         ))
-      changesBuffer ++= (additions ++ deletions)
-      // convert immutable (members) to mutable (lastVersionMembers)
-      lastVersionMembers = mutable.HashSet(members.toList: _*)
-    }
 
-    changesBuffer.toList
+      additions ++ deletions
+    })
   }
 
-  def collectRefChangesForChild(childID: String, refChanges: Iterator[RefChange]): RefChangeGroupToPropagate = RefChangeGroupToPropagate(
-    childID = childID,
-    changes = refChanges.toList.sortWith(_.timestamp.getTime < _.timestamp.getTime)
-  )
-
-  def addParentRefs (objHistory: OSMObjectHistory, changeGroup: RefChangeGroupToPropagate): OSMObjectHistory = {
-    if (changeGroup == null || changeGroup.changes.isEmpty) {
-      objHistory
+  def generateRefTree(childID: Long, refChangeHistory: Iterator[RefChange], geometryHistory: Iterator[GeometryStatus]): Iterator[RefHistory]= {
+    if (refChangeHistory == null || refChangeHistory.isEmpty) {
+      // if there are no parent references, we can safely ignore the geometryHistory and drop the object
+      Iterator.empty
     } else {
-      // we add a None at the end of the obj versions list to allow a lookahead in the for loop below
-      val objHistoryIterator = (objHistory.versions.map(Some(_)) ::: List(None)).iterator.sliding(2)
-      val parentChangesIterator: Iterator[RefChange] = changeGroup.changes.iterator
+      // TODO: which direction does this end up sorted?
+      val sortedRefChangeHistory = refChangeHistory
+        .toList
+        .sortBy(_.timestamp.getTime)
+        .toIterator
+        .buffered
 
-      var versionsBuffer = mutable.ListBuffer.empty[OSMObjectVersion]
-      var parentsBuffer = List.empty[String]
-      var parentChange: Option[RefChange] = Some(parentChangesIterator.next)
+      val sortedGeometryHistory = geometryHistory
+        .toList
+        .sortBy(_.timestamp.getTime)
+        .toIterator
+        .buffered
 
-      for (List(objVersionOption, objNextMajorVersionOption) <- objHistoryIterator) {
-        val objVersion = objVersionOption.get   // will always work -- only next objNextMajorVersionOption can be None
-        var minorVersionNumber = 0
-        var minorVersionChangeset = objVersion.changeset
-        var minorVersionTimestamp = objVersion.timestamp
+      var lastVersionRefs = Set.empty[Long]
+      var lastVersionGeometry = false
+      var history = mutable.ListBuffer.empty[RefVersion]
+      while (sortedRefChangeHistory.nonEmpty || sortedGeometryHistory.nonEmpty) {
+        val thisRefChange = if (sortedRefChangeHistory.hasNext) Some(sortedRefChangeHistory.head) else None
+        val thisGeometryStatus =  if (sortedGeometryHistory.hasNext) Some(sortedGeometryHistory.head) else None
 
-        while (
-          parentChange.isDefined &&
-          (objNextMajorVersionOption.isEmpty ||
-          parentChange.get.timestamp.getTime <= objNextMajorVersionOption.get.timestamp.getTime)
-        ) {
-          if (parentChange.get.timestamp.getTime <= minorVersionTimestamp.getTime) {
-            // apply ref change to the current object version
-            // We have to include the < case here, because in certain edge cases from the old API, a node can show up as
-            // reference in a way prior to the timestamp for its v1. This may have something to do with "unwayed
-            // segments", which is where I've seen it (see http://wiki.openstreetmap.org/wiki/Unwayed_segments). In any
-            // event, we just attribute all changes to the first node version.
-            // The == case is that these ref changes were part of the same upload as the one that caused us to create
-            // this minor version
-            parentsBuffer = applyParentRefChange(parentsBuffer, parentChange.get)
-          } else {
-            // save current object version to versionsBuffer
-            versionsBuffer += objVersion.copy(
-              parents = parentsBuffer,
-              minorVersion = minorVersionNumber,
-              changeset = minorVersionChangeset,
-              timestamp = minorVersionTimestamp
-            )
-            // start a new minor object version & apply ref change to the new minor version
-            minorVersionNumber += 1
-            minorVersionChangeset = parentChange.get.changeset
-            minorVersionTimestamp = parentChange.get.timestamp
-            parentsBuffer = applyParentRefChange(parentsBuffer, parentChange.get)
-          }
-
-          parentChange = if (parentChangesIterator.hasNext) Some(parentChangesIterator.next) else None
+        val thisVersionTimestamp = (thisRefChange, thisGeometryStatus) match {
+          case (None, Some(g)) => g.timestamp.getTime
+          case (Some(r), None) => r.timestamp.getTime
+          case (Some(r), Some(g)) => Math.min(r.timestamp.getTime, g.timestamp.getTime)
         }
 
-        // save final object version from this major-version subset to versionsBuffer
-        versionsBuffer += objVersion.copy(
-          parents = parentsBuffer,
-          minorVersion = minorVersionNumber,
-          changeset = minorVersionChangeset,
-          timestamp = minorVersionTimestamp
-        )
+        val thisVersionRefChanges = sortedRefChangeHistory.takeWhile(_.timestamp.getTime < thisVersionTimestamp)
+        val thisVersionRefs = thisVersionRefChanges.foldLeft(lastVersionRefs)(applyParentRefChange)
+
+        val thisVersionGeometries = sortedGeometryHistory.takeWhile(_.timestamp.getTime < thisVersionTimestamp)
+        val thisVersionGeometry =
+          if (thisVersionGeometries.nonEmpty) thisVersionGeometries.next.hasGeometry
+          else lastVersionGeometry
+
+        history += RefVersion(new java.sql.Timestamp(thisVersionTimestamp), thisVersionGeometry, thisVersionRefs.to[Array])
+
+        lastVersionRefs = thisVersionRefs
+        lastVersionGeometry = thisVersionGeometry
       }
 
-      objHistory.copy(versions = versionsBuffer.toList)
+      // wrap result in an iterator per spark's cogroup function's requirement
+      Iterator(RefHistory(childID, history.to[Array]))
     }
   }
 
-  private def applyParentRefChange(parentRefs: List[String], parentChange: RefChange): List[String] = {
+  private def applyParentRefChange(parentRefs: Set[Long], parentChange: RefChange): Set[Long] = {
     parentChange.changeType match {
-      case RefUtils.ADD => parentChange.parentID :: parentRefs
-      case RefUtils.DELETE => parentRefs.filter(_ != parentChange.parentID)
+      case RefUtils.ADD => parentRefs + parentChange.parentID
+      case RefUtils.DELETE => parentRefs - parentChange.parentID
     }
   }
 }

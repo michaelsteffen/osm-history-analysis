@@ -3,9 +3,9 @@ package com.michaelsteffen.osm.osmdata
 import java.sql.Timestamp
 import com.michaelsteffen.osm.testspecs._
 
-class OSMObjectVersionTest extends UnitTest {
-  describe("An OSMObjectVersion") {
-    val baseVersion =  OSMObjectVersion(
+class ObjectVersionTest extends UnitTest {
+  /* describe("An OSMObjectVersion") {
+    val baseVersion =  OSMObjectVersionDEPRECATED(
       majorVersion = 1,
       minorVersion = 0,
       timestamp = new Timestamp(2017, 1, 1, 0, 0, 0, 0),
@@ -48,6 +48,6 @@ class OSMObjectVersionTest extends UnitTest {
         assert(v.isFeature === true)
       }
     }
-  }
+  } */
 }
 

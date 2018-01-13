@@ -3,6 +3,7 @@ package com.michaelsteffen.osm.changes
 import scala.collection._
 import scala.annotation.tailrec
 import com.michaelsteffen.osm.osmdata._
+import com.michaelsteffen.osm.parentrefs._
 
 object ChangeUtils {
   val FEATURE_CREATE = 0
@@ -16,12 +17,12 @@ object ChangeUtils {
   val MEMBER_ADD = 8
   val MEMBER_REMOVE = 9
 
-  def generateFirstOrderChanges(objHistory: OSMObjectHistory): ChangeResults = {
+  // TODO: rewrite this as an iterator->iterator function?
+  def generateFirstOrderChanges(id: Long, objHistory: Iterator[ObjectVersion]): ChangeResults = {
     var changeResultsBuffer = ChangeResults.empty
-    var priorVersion = OSMObjectVersion.empty
-    val id = objHistory.id
+    var priorVersion = ObjectVersion.empty
 
-    for (objVersion <- objHistory.versions) {
+    for (objVersion <- objHistory) {
       if (
         (!priorVersion.isFeature || !priorVersion.visible) &&
         (objVersion.isFeature && objVersion.visible)
@@ -44,7 +45,7 @@ object ChangeUtils {
           nodeAndMemberRemovals(id, objVersion, priorVersion)
         // if not a feature, keep only the results to propagate up
         if (!objVersion.isFeature)
-          changeResultsBuffer = changeResultsBuffer.copy(changesToSave = List.empty[Change])
+          changeResultsBuffer = changeResultsBuffer.copy(changesToSave = Array.empty[Change])
       }
       priorVersion = objVersion
     }
@@ -52,30 +53,17 @@ object ChangeUtils {
     changeResultsBuffer
   }
 
-  def collectChangesToPropagate(parentID: String, changes: Iterator[ChangeToPropagate]): ChangeGroupToPropagate =
-    ChangeGroupToPropagate(
-      parentID = parentID,
-      changes = changes
-        .toList
-        .sortWith(_.change.timestamp.getTime < _.change.timestamp.getTime)
-        .map(_.change)
-    )
-
-  def generateSecondOrderChanges(history: OSMObjectHistory, changeGroup: ChangeGroupToPropagate): ChangeResults = {
+  def generateSecondOrderChanges(history: RefHistory, changeGroup: ChangeGroupToPropagate): ChangeResults = {
     @tailrec
-    def generateRecursively(history: OSMObjectHistory, changeGroup: ChangeGroupToPropagate, accumulator: ChangeResults): ChangeResults = {
+    def generateRecursively(history: RefHistory, changeGroup: ChangeGroupToPropagate, accumulator: ChangeResults): ChangeResults = {
       if (changeGroup.changes.isEmpty) {
         accumulator
       } else if (history.versions.length == 1) {
         val thisVersion = history.versions.head
-        val thisVersionChanges = changeGroup.changes.map(
-          c => Change.nonTagChange(history.id, c.changeType, c.count, thisVersion))
+        val thisVersionChanges = changeGroup.changes.map(_.copy(featureID = history.id))
         val changeResults = ChangeResults(
-          changesToSave =
-            if (OSMDataUtils.hasGeometry(history.objType, thisVersion)) thisVersionChanges
-            else List.empty[Change],
-          changesToPropagate =
-            thisVersion.parents.flatMap(p => thisVersionChanges.map(c => ChangeToPropagate(p, c)))
+          changesToSave = if (thisVersion.wayOrRelationHasGeometry) thisVersionChanges else Array.empty[Change],
+          changesToPropagate = thisVersionChanges.flatMap(c => thisVersion.parents.map(p => ChangeToPropagate(p, c)))
         )
         accumulator ++ changeResults
       } else {
@@ -84,13 +72,10 @@ object ChangeUtils {
 
         val thisVersionChanges = changeGroup.changes
           .takeWhile(_.timestamp.getTime < nextVersion.timestamp.getTime)
-          .map(c => Change.nonTagChange(history.id, c.changeType, c.count, thisVersion))
+          .map(_.copy(featureID = history.id))
         val changeResults = ChangeResults(
-          changesToSave =
-            if (OSMDataUtils.hasGeometry(history.objType, thisVersion)) thisVersionChanges
-            else List.empty[Change],
-          changesToPropagate =
-            thisVersion.parents.flatMap(p => thisVersionChanges.map(c => ChangeToPropagate(p, c)))
+          changesToSave = if (thisVersion.wayOrRelationHasGeometry) thisVersionChanges else Array.empty[Change],
+          changesToPropagate = thisVersionChanges.flatMap(c => thisVersion.parents.map(p => ChangeToPropagate(p, c)))
         )
 
         generateRecursively(
@@ -106,7 +91,7 @@ object ChangeUtils {
 
   def coalesceChanges(changes: Iterator[Change]): List[Change] = {
     changes.foldLeft(Map.empty[Int, Change])((map, c) => {
-      val hash = (c.version, c.changeset, c.changeType).hashCode
+      val hash = (c.changeset, c.changeType).hashCode
       map.get(hash) match {
         case None => map + (hash -> c)
         case Some(x) => map + (hash -> x.copy(
@@ -117,80 +102,81 @@ object ChangeUtils {
     }).values.toList
   }
 
-  private def featureCreation(id: String, objVersion: OSMObjectVersion): ChangeResults = {
+  private def featureCreation(id: Long, objVersion: ObjectVersion): ChangeResults = {
     ChangeResults(
-      changesToSave = List(Change.nonTagChange(id, FEATURE_CREATE, 1, objVersion)),
-      changesToPropagate = List.empty[ChangeToPropagate]
+      changesToSave = Array(Change.nonTagChange(id, FEATURE_CREATE, 1, objVersion)),
+      changesToPropagate = Array.empty[ChangeToPropagate]
     )
   }
 
-  private def featureDeletion(id: String, objVersion: OSMObjectVersion): ChangeResults = {
+  private def featureDeletion(id: Long, objVersion: ObjectVersion): ChangeResults = {
     ChangeResults(
-      changesToSave = List(Change.nonTagChange(id, FEATURE_DELETE, 1, objVersion)),
-      changesToPropagate = List.empty[ChangeToPropagate]
+      changesToSave = Array(Change.nonTagChange(id, FEATURE_DELETE, 1, objVersion)),
+      changesToPropagate = Array.empty[ChangeToPropagate]
     )
   }
 
-  private def tagAdditions(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
+  private def tagAdditions(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
     val newKeys = objVersion.tags.keys.toSet.diff(priorVersion.tags.keys.toSet)
     if (newKeys.nonEmpty) ChangeResults(
-      changesToSave = List(Change.tagChange(id, TAG_ADD, newKeys.size, priorVersion, objVersion, objVersion.tags.filterKeys(newKeys))),
-      changesToPropagate = List.empty[ChangeToPropagate]
+      changesToSave = Array(Change.tagChange(id, TAG_ADD, newKeys.size, priorVersion, objVersion, objVersion.tags.filterKeys(newKeys))),
+      changesToPropagate = Array.empty[ChangeToPropagate]
     ) else ChangeResults.empty
   }
 
-  private def tagDeletions(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
+  private def tagDeletions(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
     val deletedKeys = priorVersion.tags.keys.toSet.diff(objVersion.tags.keys.toSet)
     if (deletedKeys.nonEmpty) ChangeResults(
-      changesToSave = List(Change.tagChange(id, TAG_DELETE, deletedKeys.size, priorVersion, objVersion, priorVersion.tags.filterKeys(deletedKeys))),
-      changesToPropagate = List.empty[ChangeToPropagate]
+      changesToSave = Array(Change.tagChange(id, TAG_DELETE, deletedKeys.size, priorVersion, objVersion, priorVersion.tags.filterKeys(deletedKeys))),
+      changesToPropagate = Array.empty[ChangeToPropagate]
     ) else ChangeResults.empty
   }
 
-  private def tagChanges(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
+  private def tagChanges(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
     val sharedKeys = objVersion.tags.keySet.intersect(priorVersion.tags.keySet)
     val keysWithChanges = sharedKeys.filter(key => objVersion.tags(key) != priorVersion.tags(key))
     if (keysWithChanges.nonEmpty) ChangeResults(
-      changesToSave = List(Change.tagChange(id, TAG_CHANGE, keysWithChanges.size, priorVersion, objVersion, objVersion.tags.filterKeys(keysWithChanges))),
-      changesToPropagate = List.empty[ChangeToPropagate]
+      changesToSave = Array(Change.tagChange(id, TAG_CHANGE, keysWithChanges.size, priorVersion, objVersion, objVersion.tags.filterKeys(keysWithChanges))),
+      changesToPropagate = Array.empty[ChangeToPropagate]
     ) else ChangeResults.empty
   }
 
-  private def nodeMoves(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
-    if (id(0) == 'n' && (objVersion.lat, objVersion.lon) != (priorVersion.lat, priorVersion.lon)) {
+  // the changes below can propagate, but on the first iteration we just "propagate" them to ourselves
+  private def nodeMoves(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
+    if (OSMDataUtils.isNode(id) && (objVersion.lat, objVersion.lon) != (priorVersion.lat, priorVersion.lon)) {
       val change = Change.nonTagChange(id, NODE_MOVE, 1, objVersion)
       ChangeResults(
-        changesToSave = List(change),
-        changesToPropagate = objVersion.parents.map(ChangeToPropagate(_, change))
+        changesToSave = Array(change),
+        changesToPropagate = Array(ChangeToPropagate(id, change))
       )
     } else {
       ChangeResults.empty
     }
   }
 
-  private def nodeAndMemberAdditions(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
-    if (id(0) == 'w' || id(0) == 'r') {
+  private def nodeAndMemberAdditions(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
+    if (OSMDataUtils.isWay(id) || OSMDataUtils.isRelation(id)) {
       val newMembersCount = objVersion.children.toSet.diff(priorVersion.children.toSet).size
-      val changeType = if (id(0) == 'w') NODE_ADD else MEMBER_ADD
+      val changeType = if (OSMDataUtils.isWay(id)) NODE_ADD else MEMBER_ADD
       if (newMembersCount > 0) {
         val change = Change.nonTagChange(id, changeType, newMembersCount, objVersion)
         ChangeResults(
-          changesToSave = List(change),
-          changesToPropagate = objVersion.parents.map(ChangeToPropagate(_, change))
+          changesToSave = Array(change),
+          changesToPropagate = Array(ChangeToPropagate(id, change))
         )
       } else ChangeResults.empty
     } else ChangeResults.empty
   }
 
-  private def nodeAndMemberRemovals(id: String, objVersion: OSMObjectVersion, priorVersion: OSMObjectVersion): ChangeResults = {
-    if (id(0) == 'w' || id(0) == 'r') {
+  private def nodeAndMemberRemovals(id: Long, objVersion: ObjectVersion, priorVersion: ObjectVersion): ChangeResults = {
+    if (OSMDataUtils.isWay(id) || OSMDataUtils.isRelation(id)) {
       val removedMembersCount = priorVersion.children.toSet.diff(objVersion.children.toSet).size
-      val changeType = if (id(0) == 'w') NODE_REMOVE else MEMBER_REMOVE
+      val changeType = if (OSMDataUtils.isWay(id)) NODE_REMOVE else MEMBER_REMOVE
       if (removedMembersCount > 0) {
         val change = Change.nonTagChange(id, changeType, removedMembersCount, objVersion)
         ChangeResults(
-          changesToSave = List(change),
-          changesToPropagate = objVersion.parents.map(ChangeToPropagate(_, change))
+          changesToSave = Array(change),
+          changesToPropagate = Array(ChangeToPropagate(id, change))
         )
       } else ChangeResults.empty
     } else ChangeResults.empty

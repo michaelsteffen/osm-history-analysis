@@ -1,11 +1,11 @@
 package com.michaelsteffen.osm.osmdata
 
 import com.michaelsteffen.osm.testspecs._
-import com.michaelsteffen.osm.rawosmdata._
+import com.michaelsteffen.osm.osmdata._
 import java.sql._
 
 class OSMDataUtilsTest extends UnitTest {
-  describe("The createID method") {
+  /* describe("The createID method") {
     it("should create a correct id for a node") {
       assert(OSMDataUtils.createID(100, "node") === "n100")
     }
@@ -47,11 +47,11 @@ class OSMDataUtilsTest extends UnitTest {
         visible = true
       )
 
-      val baseOSMObjectHistory = OSMObjectHistory(
+      val baseOSMObjectHistory = OSMObjectHistoryDEPRECATED(
         objType = "n",
         id = "n100",
         versions = List(
-          OSMObjectVersion(
+          OSMObjectVersionDEPRECATED(
             majorVersion = 1,
             minorVersion = 0,
             timestamp = new Timestamp(2017, 1, 1, 0, 0, 0, 0),
@@ -134,5 +134,5 @@ class OSMDataUtilsTest extends UnitTest {
         assert(converted.versions.head.children === expected)
       }
     }
-  }
+  } */
 }
