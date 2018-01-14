@@ -10,7 +10,7 @@ if sbt assembly; then
 
     echo "Creating cluster..."
     aws emr create-cluster \
-      --name "OSM History Analysis Cluster (Planet)" \
+      --name "OSM History Analysis Cluster (Planet) (50M blocks) (r4.xl driver)" \
       --tags "job=osm-history-planet" \
       --region us-east-1 \
       --ec2-attributes SubnetId=subnet-c84fda83,KeyName=OSMHistoryKey \

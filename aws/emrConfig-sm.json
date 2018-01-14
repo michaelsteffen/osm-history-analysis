@@ -7,10 +7,11 @@
       "spark.yarn.executor.memoryOverhead": "1G",
       "spark.executor.memory": "4G",
       "spark.yarn.driver.memoryOverhead": "2G",
-      "spark.driver.memory": "3G",
+      "spark.driver.memory": "4G",
       "spark.executor.cores": "4",
-      "spark.driver.cores": "4",
-      "spark.default.parallelism": "200"
+      "spark.driver.cores": "2",
+      "spark.driver.maxResultSize": "75M",
+      "spark.default.parallelism": "32"
     }
   }
 ]

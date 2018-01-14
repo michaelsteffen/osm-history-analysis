@@ -107,7 +107,6 @@ aws emr create-cluster \
   --auto-terminate
 ```
 
-
 ### Querying in Athena
 
 In the Athena console, or via the AWS CLI...
@@ -115,7 +114,7 @@ In the Athena console, or via the AWS CLI...
 #### Create the tables
 ```
 CREATE EXTERNAL TABLE changes (
-  featureID STRING,
+  featureID BIGINT,
   changeType INT,
   count INT,
   version BIGINT,
@@ -124,6 +123,7 @@ CREATE EXTERNAL TABLE changes (
   bbox STRUCT<min: STRUCT<lon: DECIMAL(10,7), lat: DECIMAL(9,7)>, max: STRUCT<lon: DECIMAL(10,7),lat: DECIMAL(9,7)>>,
   timestamp TIMESTAMP, 
   changeset BIGINT
+  depth INT
 )
 STORED AS ORCFILE
 LOCATION 's3://bucket/prefix/changes.orc';
@@ -156,11 +156,14 @@ ORDER BY count(*) DESC
 
 ### Notes on AWS EMR configurations
 
-I've included configurations for 3 different recommended cluster sizes in [./aws](/aws). All configurations run on Spot instances, with a bid at the On Demand price. Intermediate checkpointing to S3 to deal with lost Spot instances is a work in progress. I've had no issues with Spot interruptions, but if you're worried about it you can switch to On Demand instances.
+I've included configurations for 3 different recommended cluster sizes in [./aws](/aws). All configurations run on Spot instances, with a bid at the On Demand price. I've had no issues with Spot interruptions, but if you're worried about it you can switch to Defined Duration or On Demand instances.
 
-- Small -- Able to process an ORC of ~250 MB (e.g., medium US state) in ~30 minutes. Approx. $0.20-$0.40/hr depending on Spot prices.
-- Large -- 20x compute, 40x memory, 200x disk vs small. Able to process the planet history in about [[6]] hours. Approx. $3.20-$6.40/hr depending on Spot prices.
-- X-Large -- 4x or more compute (depending on how AWS meets instance-fleet requests), 4x memory, 1x disk vs large. Able to process the planet history in about [[8]] hours. Approx. [[XX]]/hr depending on Spot prices.
+- Small -- Able to process an ORC of ~1.5 GB (e.g., large US state or European country) in about 2 hours. Approx. $0.20-$0.40/hr depending on Spot prices.
+- Large -- 20x compute, 55x memory, 50x disk vs small. Able to process the planet history in about 4.5 hours. Approx. [[$3.20-$6.40/hr]] depending on Spot prices.
+
+Processing a 1.5 MB ORC -- about 1/40 the size of the planet -- on the small cluster is a good way to test changes to the codebase. Indeed, the small cluster is optimized for testing, not for production processing of excerpts. If a 1.5GB excerpt runs on the small cluster, you can be reasonably confident that a planet job will run on the large cluster. (The one exception is out-of-memory errors on the driver at planet-scale, which the small cluster will not help you catch.) California works well for this kind of testing.
+
+If you want to tweak the cluster configurations, you'll need to edit both the instanceGroup and emrConfig files in the /aws directory. The memory allocation is the trickiest part. See [my notes](aws/README.md). 
 
 ## More on data output 
 

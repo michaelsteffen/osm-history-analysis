@@ -3,14 +3,15 @@
     "Classification": "spark-defaults",
     "Properties": {
       "spark.dynamicAllocation.enabled": "false",
-      "spark.executor.instances": "20",
+      "spark.executor.instances": "40",
       "spark.yarn.executor.memoryOverhead": "3G",
-      "spark.executor.memory": "9G",
-      "spark.yarn.driver.memoryOverhead": "2G",
-      "spark.driver.memory": "3G",
+      "spark.executor.memory": "11250M",
+      "spark.yarn.driver.memoryOverhead": "5G",
+      "spark.driver.memory": "20G",
       "spark.executor.cores": "4",
-      "spark.driver.cores": "4",
-      "spark.default.parallelism": "200"
+      "spark.driver.cores": "6",
+      "spark.driver.maxResultSize": "15G",
+      "spark.default.parallelism": "640"
     }
   }
 ]

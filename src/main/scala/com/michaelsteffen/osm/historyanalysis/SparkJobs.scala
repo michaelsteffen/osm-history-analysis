@@ -35,7 +35,6 @@ object SparkJobs {
     val relationsRefTree = refTree.filter(o => OSMDataUtils.isRelation(o.id))
 
     refTree.persist(StorageLevel.MEMORY_ONLY)
-    // not sure on this one
     relationsRefTree.persist(StorageLevel.MEMORY_ONLY)
 
     if (debugMode) refTree.show(100)
@@ -53,15 +52,14 @@ object SparkJobs {
           .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
           .mapGroups(ChangeUtils.generateFirstOrderChanges)
         else if (i == 1) refTree
-          // TODO: we're now going to double-save changes on the first pass
           .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i))
+          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i-1, propagateOnly = true))
         else if (i == 2) waysAndRelationsRefTree
           .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i))
+          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i-1))
         else relationsRefTree
           .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i))
+          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i-1))
 
       if (debugMode && i == 0) changesToSaveAndPropagate(0).flatMap(_.changesToSave).show(100)
 
@@ -70,9 +68,6 @@ object SparkJobs {
         .groupByKey(_.parentID)
         .mapGroups((id: Long, changes: Iterator[ChangeToPropagate]) => ChangeGroupToPropagate(id, changes.map(_.change).toArray))
     }
-
-    // flag to hold onto this one so we don't have to generate it twice. should be empty or close to it
-    // changesToSaveAndPropagate(DEPTH-1).persist(StorageLevel.MEMORY_ONLY)
 
     // Almost ready . . .
     val changes =
@@ -84,8 +79,5 @@ object SparkJobs {
 
     // And . . . finally! Save all the changes, triggering our long chain of dominoes
     changes.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "changes.orc")
-
-    // save any residual changesToPropagate so we can see what (if any) failed to resolve after 10 iterations
-    // changesToPropagate(DEPTH-1).write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "residualChangesToPropagate.orc")
   }
 }
