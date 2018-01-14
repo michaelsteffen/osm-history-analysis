@@ -1,0 +1,14 @@
+[
+  {
+    "Name": "OSM History Analysis",
+    "Type": "Spark",
+    "ActionOnFailure": "TERMINATE_JOB_FLOW",
+    "Args": [
+      "--class", "com.michaelsteffen.osm.historyanalysis.App",
+      "--deploy-mode", "cluster",
+      "s3://osm-history/osm-history-analysis.jar",
+      "s3://osm-history/brazil.osh.orc",
+      "s3://osm-history/br-history/"
+    ]
+  }
+]

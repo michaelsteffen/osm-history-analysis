@@ -9,16 +9,16 @@
   {
     "Name": "core",
     "InstanceGroupType": "CORE",
-    "InstanceCount": 2,
-    "InstanceType": "m4.large",
-    "BidPrice": ".1",
+    "InstanceCount": 1,
+    "InstanceType": "r4.xlarge",
+    "BidPrice": ".266",
     "EbsConfiguration": {
       "EbsOptimized": true,
       "EbsBlockDeviceConfigs": [
         {
           "VolumeSpecification": {
             "VolumeType": "gp2",
-            "SizeInGB": 50
+            "SizeInGB": 100
           },
           "VolumesPerInstance": 1
         }

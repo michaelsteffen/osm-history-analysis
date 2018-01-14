@@ -11,7 +11,7 @@
     "InstanceGroupType": "CORE",
     "InstanceType": "r4.4xlarge",
     "InstanceCount": 5,
-    "BidPrice": ".532",
+    "BidPrice": "1.064",
     "EbsConfiguration": {
       "EbsOptimized": true,
       "EbsBlockDeviceConfigs": [

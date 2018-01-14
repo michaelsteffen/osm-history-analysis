@@ -6,22 +6,22 @@ if sbt assembly; then
     aws s3 cp ./target/scala-2.11/osm-history-analysis.jar s3://osm-history/osm-history-analysis.jar
 
     echo "Cleaning previous run from S3..."
-    aws s3 rm s3://osm-history/ca-history/ --recursive
+    aws s3 rm s3://osm-history/br-history/ --recursive
 
     echo "Creating cluster..."
     aws emr create-cluster \
-      --name "OSM History Analysis Cluster (CA) (125M partitions)" \
-      --tags "job=osm-history-ca" \
+      --name "OSM History Analysis Cluster (BR) (50M partitions) (cluster mode)" \
+      --tags "job=osm-history-br" \
       --region us-east-1 \
       --ec2-attributes SubnetId=subnet-c84fda83,KeyName=OSMHistoryKey \
       --instance-groups file://./aws/instanceGroups-sm.json \
-      --log-uri s3://osm-history/logs/ca/ \
+      --log-uri s3://osm-history/logs/br/ \
       --use-default-roles \
       --configurations file://./aws/emrConfig-sm.json \
       --visible-to-all-users \
       --applications Name="Spark" Name="Ganglia" \
       --release-label emr-5.11.0 \
-      --steps file://./aws/steps-ca.json \
+      --steps file://./aws/steps-br.json \
       --auto-terminate
 else
     echo "Build failed. Aborting cluster creation."
