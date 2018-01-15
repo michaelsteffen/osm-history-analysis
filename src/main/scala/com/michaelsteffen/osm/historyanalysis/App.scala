@@ -52,14 +52,15 @@ object App {
   private def optimizeParallelism(numRecords: Long): Unit = {
     // based on some experimentation with samples:
     //   - data size is generally ~100 bytes per OSM object
-    //   - we aim for shuffle blocks on average about 125MB
-    //     (see https://www.slideshare.net/cloudera/top-5-mistakes-to-avoid-when-writing-apache-spark-applications)
+    //   - we aim for shuffle blocks on average about 150MB
+    //     (see https://www.slideshare.net/cloudera/top-5-mistakes-to-avoid-when-writing-apache-spark-applications
+    //     and this matches my experiments)
     // so we set partitions for the whole operation chain to:
-    //   num objects * 100 bytes / 1250MB  = numObjects / 1,250,000
-    // we also want to fully utilize all cores, so we set a floor of:
+    //   num objects * 100 bytes / 150MB  = numObjects / 1,500,000
+    // we also want to fully utilize all cores, so for very small jobs we set a floor of:
     //   number of cores in the cluster * 4
 
-    val numPartitions = numRecords/500000
+    val numPartitions = numRecords/1500000
     val spark = SparkSession.builder.getOrCreate()
     val numExecutors = spark.conf.getOption("spark.executor.instances").getOrElse("1").toInt
     val coresPerExecutor = spark.conf.getOption("spark.executor.cores").getOrElse("2").toInt
