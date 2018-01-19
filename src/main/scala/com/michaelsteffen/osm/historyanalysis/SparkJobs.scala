@@ -7,12 +7,15 @@ import org.apache.spark.sql._
 import org.apache.spark.storage.StorageLevel
 
 object SparkJobs {
-  def generateChanges(rawHistoryLocation: String, outputLocation: String, debugMode: Boolean): Unit = {
+  def generateGeometryChanges(rawHistoryLocation: String, outputLocation: String): Unit = {
     val spark = SparkSession.builder.getOrCreate()
     import spark.implicits._
     val DEPTH = 10
 
-    val refChanges = spark.read.orc(rawHistoryLocation).as[ObjectVersion]
+    // 1. Create a ref tree from children -> parents
+
+    val refChanges = spark.read.orc(rawHistoryLocation)
+      .as[ObjectVersion]
       .filter(o => o.`type` == "way" || o.`type` == "relation" )
       //should be cheap shuffle b/c ORC should already be sorted this way?
       .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
@@ -29,55 +32,60 @@ object SparkJobs {
       .groupByKey(_.childID)
       .cogroup(geometryStatuses)(RefUtils.generateRefTree)
 
-    // setup for later iterative traversal of the tree . . .
-    // on second pass we can look only at ways and relations, and all subsequent passes we can look only at relations
+    // 2. Create feature geometries (using the ref tree)
+
+    // setup for iterative traversal of the ref tree: on second pass we can look only at ways and relations, and all
+    // subsequent passes we can look only at relations
     val waysAndRelationsRefTree = refTree.filter(o => OSMDataUtils.isWay(o.id) || OSMDataUtils.isRelation(o.id))
     val relationsRefTree = refTree.filter(o => OSMDataUtils.isRelation(o.id))
 
     refTree.persist(StorageLevel.MEMORY_ONLY)
     relationsRefTree.persist(StorageLevel.MEMORY_ONLY)
 
-    if (debugMode) refTree.show(100)
+    // gather node locations at all key times: (a) when nodes are first added to a feature, and (b) when the location changes
+    val nodeLocationsToPropagate = spark.read.orc(rawHistoryLocation)
+      .as[ObjectVersion]
+      .filter(o => o.`type` == "node")
+      .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
+      .map((id, vers) => ObjectHistory(id, vers))
+      .joinWith(refTree)
+      .map(GeometryUtils.generateKeyNodeLocationVersions)
 
     // initialize accumulators
-    val changesToSaveAndPropagate = new Array[Dataset[ChangeResults]](DEPTH)
-    val changesToPropagate = new Array[Dataset[ChangeGroupToPropagate]](DEPTH)
+    val geometriesToSaveAndPropagate = new Array[Dataset[ChangeResults]](DEPTH)
+    val geometriesToPropagate = new Array[Dataset[ChangeGroupToPropagate]](DEPTH)
 
-    // iterate to propagate changes up through references up to 10 layers deep (e.g. relation->relation->relation->way->node)
-    // this loop just creates the dependency graph, we don't knock down the dominoes just yet
+    // propagate geometries up through references up to 10 layers deep (e.g. relation->relation->relation->way->node)
     for (i <- 0 until DEPTH) {
-      changesToSaveAndPropagate(i) =
-        if (i == 0) spark.read.orc(rawHistoryLocation)
-          .as[ObjectVersion]
-          .groupByKey(obj => OSMDataUtils.createID(obj.id, obj.`type`))
-          .mapGroups(ChangeUtils.generateFirstOrderChanges)
-        else if (i == 1) refTree
-          .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i-1, propagateOnly = true))
-        else if (i == 2) waysAndRelationsRefTree
-          .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i-1))
+      geometriesToSaveAndPropagate =
+        if (i == 0) waysAndRelationsRefTree
+          .joinWith(nodeLocationsToPropagate, $"id" === $"parentID")
+          .map(t => GeometryUtils.generateGeometries(t._1, t._2, i))
         else relationsRefTree
-          .joinWith(changesToPropagate(i-1), $"id" === $"parentID")
-          .map(t => ChangeUtils.generateSecondOrderChanges(t._1, t._2, i-1))
+          .joinWith(geometriesToPropagate(i-1), $"id" === $"parentID")
+          .map(t => GeometryUtils.generateGeometries(t._1, t._2, i-1))
 
-      if (debugMode && i == 0) changesToSaveAndPropagate(0).flatMap(_.changesToSave).show(100)
-
-      changesToPropagate(i) = changesToSaveAndPropagate(i)
-        .flatMap(_.changesToPropagate)
+      geometriesToPropagate(i) = geometriesToSaveAndPropagate(i)
+        .flatMap(_.geometriesToPropagate)
         .groupByKey(_.parentID)
         .mapGroups((id: Long, changes: Iterator[ChangeToPropagate]) => ChangeGroupToPropagate(id, changes.map(_.change).toArray))
     }
 
-    // Almost ready . . .
-    val changes =
-      changesToSaveAndPropagate
-      .map(_.flatMap(_.changesToSave))
+    val geometries = geometriesToSaveAndPropagate
+      .map(_.flatMap(_.geometriesToSave))
       .reduceLeft(_.union(_))
       .groupByKey(_.featureID)
-      .flatMapGroups((id, changes) => ChangeUtils.coalesceChanges(changes))
+      .flatMapGroups((id, geometries) => GeometryUtils.combineGeometries(geometries))
 
-    // And . . . finally! Save all the changes, triggering our long chain of dominoes
-    changes.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "changes.orc")
+    // 3. Combine raw OSM data with geometries and ref tree to create full augmented history
+
+    val augmentedHistory = spark.read.orc(rawHistoryLocation).as[ObjectVersion]
+      .join(refTree)
+      .map(historyUtils.addRefs)
+      .join(geomtries)
+      .map(historyUtils.addGeometries)
+
+    // Finally, save the results
+    augmentedHistory.write.mode(SaveMode.Overwrite).format("orc").save(outputLocation + "augmented-history.orc")
   }
 }

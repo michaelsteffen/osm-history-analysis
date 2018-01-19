@@ -7,7 +7,7 @@ object RefUtils {
   val ADD = 0
   val DELETE = 1
 
-  // iterator->iterator transformations. see _High Performance Spark_ at p. 98
+  // iterator->iterator transformation. see _High Performance Spark_ at p. 98
   def generateRefChanges(id: Long, objHistory: Iterator[ObjectVersion]): Iterator[RefChange] = {
     val pairedObjHistory = (Iterator(None) ++ objHistory.map(Some(_))).sliding(2)
     pairedObjHistory.flatMap(p => {
@@ -43,6 +43,8 @@ object RefUtils {
 
   def generateRefTree(childID: Long, refChangeHistory: Iterator[RefChange], geometryHistory: Iterator[GeometryStatus]): Iterator[RefHistory]= {
     if (refChangeHistory == null || refChangeHistory.isEmpty) {
+      ---
+      // TODO: I think the statement below is false -- what about a way or relation with no parents?
       // if there are no parent references, we can safely ignore the geometryHistory and drop the object
       Iterator.empty
     } else {
@@ -63,6 +65,8 @@ object RefUtils {
       var lastVersionGeometry = false
       var history = mutable.ListBuffer.empty[RefVersion]
       while (sortedRefChangeHistory.nonEmpty || sortedGeometryHistory.nonEmpty) {
+        --
+        // TODO: this logic is broken because we advance both iterators by one, even if we're only using one of them.
         val thisRefChange = if (sortedRefChangeHistory.hasNext) Some(sortedRefChangeHistory.head) else None
         val thisGeometryStatus =  if (sortedGeometryHistory.hasNext) Some(sortedGeometryHistory.head) else None
 
@@ -86,7 +90,7 @@ object RefUtils {
         lastVersionGeometry = thisVersionGeometry
       }
 
-      // wrap result in an iterator per spark's cogroup function's requirement
+      // wrap result in an iterator for spark's cogroup function
       Iterator(RefHistory(childID, history.to[Array]))
     }
   }

@@ -1,39 +1,51 @@
-package com.michaelsteffen.osm.changes
+package com.michaelsteffen.osm.geometries
 
 import scala.collection._
 import scala.annotation.tailrec
 import com.michaelsteffen.osm.osmdata._
 import com.michaelsteffen.osm.parentrefs._
 
-object ChangeUtils {
-  val FEATURE_CREATE = 0
-  val FEATURE_DELETE = 1
-  val TAG_ADD = 2
-  val TAG_DELETE = 3
-  val TAG_CHANGE = 4
-  val NODE_MOVE = 5
-  val NODE_ADD = 6
-  val NODE_REMOVE = 7
-  val MEMBER_ADD = 8
-  val MEMBER_REMOVE = 9
+object GeometryUtils {
+  def generateKeyNodeLocations(id: Long, nodeHistory: ObjectHistory, refHistory: RefHistory): List[NodeLocationToPropagate] = {
+    if (refHistory == null || refHistory.versions.isEmpty) {
+      // if a node has no parents at any point in time, we can safely ignore it
+      List.empty[NodeLocation]
+    } else {
+      val refVersions = refHistory.versions.toIterator.buffered
+      val nodeVersions = nodeHistory.versions.toIterator.buffered
 
-  def generateFirstOrderGeometryChanges(id: Long, objHistory: Iterator[ObjectVersion]): ChangeResults = {
-    var changeResultsBuffer = ChangeResults.empty
-    var priorVersion = ObjectVersion.empty
+      var lastVersionRefs = Set.empty[Long]
+      var locationsBuffer = mutable.ListBuffer.empty[NodeLocation]
+      // step through parent reference versions and node geometry versions, capturing locations whenever there is either:
+      //   - a new parent reference added (in which case the new parent needs to know the node's location at that moment in time); or
+      //   - a change in the node's location (in which case all the parents need to know about the move)
+      while (refVersions.nonEmpty || nodeVersions.nonEmpty) {
+        --
+        // TODO: this logic is broken because we advance both iterators by one, even if we're only using one of them.
+        val nextRefVersion = if (refVersions.hasNext) Some(refVersions.head) else None
+        val nextNodeVersion =  if (nodeVersions.hasNext) Some(nodeVersions.head) else None
 
-    val sortedObjHistory = objHistory.toList.sortBy(_.timestamp.getTime)
-    for (objVersion <- sortedObjHistory) {
-      changeResultsBuffer = changeResultsBuffer ++
-        nodeMoves(id, objVersion, priorVersion) ++
-        nodeAndMemberAdditions(id, objVersion, priorVersion) ++
-        nodeAndMemberRemovals(id, objVersion, priorVersion)
-      // if not a feature, keep only the results to propagate up
-      if (!objVersion.isFeature)
-        changeResultsBuffer = changeResultsBuffer.copy(changesToSave = Array.empty[Change])
-      priorVersion = objVersion
+        val timestamp = (nextRefVersion, nextNodeVersion) match {
+          case (None, Some(n)) => n.timestamp.getTime
+          case (Some(r), None) => r.timestamp.getTime
+          case (Some(r), Some(n)) => Math.min(r.timestamp.getTime, n.timestamp.getTime)
+        }
+
+        // TODO: add this
+        val location =
+
+        // TODO: should be at most 1 in each category, right? logic should account for this
+        val thisVersionMoves = nodeMoves(nodeVersions.takeWhile(_.timestamp.getTime < thisVersionTimestamp), location, nextLocation)
+        val thisVersionParentAdditions = parentAdditions(nodeVersions.takeWhile(_.timestamp.getTime < thisVersionTimestamp), lastVersionRefs , nextLocation)
+
+        locationsBuffer += (thisVersionMoves ++ thisVersionParentAdditions)
+
+        lastVersionRefs = thisVersionRefs
+        lastLocation = location
+      }
+
+      locationsBuffer.toList
     }
-
-    changeResultsBuffer
   }
 
   def generateSecondOrderChanges(history: RefHistory, changeGroup: ChangeGroupToPropagate, depth: Int, propagateOnly: Boolean = false): ChangeResults = {
@@ -72,7 +84,7 @@ object ChangeUtils {
     generateRecursively(history, changeGroup, ChangeResults.empty)
   }
 
-  def coalesceChanges(changes: Iterator[Change]): List[Change] = {
+  def collectGeometries(changes: Iterator[Change]): List[Change] = {
     changes.foldLeft(Map.empty[Int, Change])((map, c) => {
       val hash = (c.changeset, c.changeType).hashCode
       map.get(hash) match {

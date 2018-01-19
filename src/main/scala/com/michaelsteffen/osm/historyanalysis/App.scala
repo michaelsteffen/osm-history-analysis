@@ -31,7 +31,7 @@ object App {
         optimizeParallelism(recordCount)
 
         // do all the things
-        SparkJobs.generateChanges(opts.inputDataLocation, opts.outputDataLocation, opts.debugMode)
+        SparkJobs.generateGeometryChanges(opts.inputDataLocation, opts.outputDataLocation)
 
         spark.stop()
     }
