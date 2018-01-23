@@ -1,6 +1,7 @@
-package com.michaelsteffen.osm.historyanalysis
+package com.michaelsteffen.osm.historyaugmenter
 
 import com.michaelsteffen.osm.changes._
+import com.michaelsteffen.osm.geometries.{ChangeGroupToPropagate, ChangeResults, ChangeToPropagate}
 import com.michaelsteffen.osm.parentrefs._
 import com.michaelsteffen.osm.osmdata._
 import org.apache.spark.sql._

@@ -1,5 +1,6 @@
 package com.michaelsteffen.osm.changes
 
+import com.michaelsteffen.osm.geometries.Point
 import com.michaelsteffen.osm.osmdata._
 
 final case class Change (

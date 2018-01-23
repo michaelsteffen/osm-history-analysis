@@ -1,4 +1,6 @@
-package com.michaelsteffen.osm.changes
+package com.michaelsteffen.osm.geometries
+
+import com.michaelsteffen.osm.changes.Change
 
 final case class ChangeResults (
   changesToSave: Array[Change],

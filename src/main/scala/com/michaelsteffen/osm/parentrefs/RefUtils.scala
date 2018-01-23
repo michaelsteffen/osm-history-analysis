@@ -42,6 +42,7 @@ object RefUtils {
   }
 
   def generateRefTree(childID: Long, refChangeHistory: Iterator[RefChange], geometryHistory: Iterator[GeometryStatus]): Iterator[RefHistory]= {
+    // TODO: preserve changeset info for ref changes so we can include it in the augmented history
     if (refChangeHistory == null || refChangeHistory.isEmpty) {
       ---
       // TODO: I think the statement below is false -- what about a way or relation with no parents?

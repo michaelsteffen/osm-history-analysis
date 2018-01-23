@@ -1,5 +1,8 @@
 package com.michaelsteffen.osm.changes
 
+import com.michaelsteffen.osm.geometries
+import com.michaelsteffen.osm.geometries.{ChangeGroupToPropagate, ChangeResults, ChangeToPropagate}
+
 import scala.collection._
 import scala.annotation.tailrec
 import com.michaelsteffen.osm.osmdata._
@@ -44,7 +47,7 @@ object ChangeUtils {
       } else if (history.versions.length == 1) {
         val thisVersion = history.versions.head
         val thisVersionChanges = changeGroup.changes.map(_.copy(featureID = history.id, depth = depth))
-        val changeResults = ChangeResults(
+        val changeResults = geometries.ChangeResults(
           changesToSave = if (thisVersion.wayOrRelationHasGeometry && !propagateOnly) thisVersionChanges else Array.empty[Change],
           changesToPropagate = thisVersionChanges.flatMap(c => thisVersion.parents.map(p => ChangeToPropagate(p, c)))
         )
@@ -56,7 +59,7 @@ object ChangeUtils {
         val thisVersionChanges = changeGroup.changes
           .takeWhile(_.timestamp.getTime < nextVersion.timestamp.getTime)
           .map(_.copy(featureID = history.id, depth = depth))
-        val changeResults = ChangeResults(
+        val changeResults = geometries.ChangeResults(
           changesToSave = if (thisVersion.wayOrRelationHasGeometry && !propagateOnly) thisVersionChanges else Array.empty[Change],
           changesToPropagate = thisVersionChanges.flatMap(c => thisVersion.parents.map(p => ChangeToPropagate(p, c)))
         )

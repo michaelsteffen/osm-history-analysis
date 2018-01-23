@@ -6,7 +6,7 @@ import com.michaelsteffen.osm.osmdata._
 import com.michaelsteffen.osm.parentrefs._
 
 object GeometryUtils {
-  def generateKeyNodeLocations(id: Long, nodeHistory: ObjectHistory, refHistory: RefHistory): List[NodeLocationToPropagate] = {
+  def extractKeyNodeLocations(id: Long, nodeHistory: ObjectHistory, refHistory: RefHistory): List[NodeLocationToPropagate] = {
     if (refHistory == null || refHistory.versions.isEmpty) {
       // if a node has no parents at any point in time, we can safely ignore it
       List.empty[NodeLocation]
@@ -14,11 +14,12 @@ object GeometryUtils {
       val refVersions = refHistory.versions.toIterator.buffered
       val nodeVersions = nodeHistory.versions.toIterator.buffered
 
-      var lastVersionRefs = Set.empty[Long]
-      var locationsBuffer = mutable.ListBuffer.empty[NodeLocation]
       // step through parent reference versions and node geometry versions, capturing locations whenever there is either:
       //   - a new parent reference added (in which case the new parent needs to know the node's location at that moment in time); or
       //   - a change in the node's location (in which case all the parents need to know about the move)
+      var lastVersionParents = Set.empty[Long]
+      var lastLocation = // TODO: what datatype?
+      var locationsBuffer = mutable.ListBuffer.empty[NodeLocation]
       while (refVersions.nonEmpty || nodeVersions.nonEmpty) {
         --
         // TODO: this logic is broken because we advance both iterators by one, even if we're only using one of them.
@@ -31,16 +32,18 @@ object GeometryUtils {
           case (Some(r), Some(n)) => Math.min(r.timestamp.getTime, n.timestamp.getTime)
         }
 
-        // TODO: add this
-        val location =
+        // TODO:
+        val location = //lastLocation or latest location in <= timestamp if different
+        val parents = // lastVersionRefs or latest set of refs <= timestamp if different
+        val newParents = // any parents in parents but not in lastVersionParents
 
         // TODO: should be at most 1 in each category, right? logic should account for this
-        val thisVersionMoves = nodeMoves(nodeVersions.takeWhile(_.timestamp.getTime < thisVersionTimestamp), location, nextLocation)
-        val thisVersionParentAdditions = parentAdditions(nodeVersions.takeWhile(_.timestamp.getTime < thisVersionTimestamp), lastVersionRefs , nextLocation)
+        val movesToPropagate = nodeMoves(lastlocation, location, parents)
+        val locationsToPropagateToNewParents = parentAdditions(location, newParents)
 
-        locationsBuffer += (thisVersionMoves ++ thisVersionParentAdditions)
+        locationsBuffer += (movesToPropagate ++ locationsToPropagateToNewParents)
 
-        lastVersionRefs = thisVersionRefs
+        lastVersionParents = parents
         lastLocation = location
       }
 
@@ -48,7 +51,7 @@ object GeometryUtils {
     }
   }
 
-  def generateSecondOrderChanges(history: RefHistory, changeGroup: ChangeGroupToPropagate, depth: Int, propagateOnly: Boolean = false): ChangeResults = {
+  def generateGeometries(history: RefHistory, changeGroup: ChangeGroupToPropagate, depth: Int, propagateOnly: Boolean = false): ChangeResults = {
     @tailrec
     def generateRecursively(history: RefHistory, changeGroup: ChangeGroupToPropagate, accumulator: ChangeResults): ChangeResults = {
       if (changeGroup.changes.isEmpty) {

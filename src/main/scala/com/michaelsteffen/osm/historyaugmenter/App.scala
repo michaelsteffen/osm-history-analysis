@@ -1,4 +1,4 @@
-package com.michaelsteffen.osm.historyanalysis
+package com.michaelsteffen.osm.historyaugmenter
 
 import org.apache.spark.sql._
 import com.michaelsteffen.osm.osmdata._

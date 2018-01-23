@@ -1,4 +1,4 @@
-package com.michaelsteffen.osm.historyanalysis
+package com.michaelsteffen.osm.historyaugmenter
 
 case class Opts (
   inputDataLocation: String,
