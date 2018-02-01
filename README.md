@@ -1,8 +1,8 @@
-[Work in Progress]
-
 Generate easily queryable OpenStreetMap change histories using Spark. Process the entire global history of OpenStreetMap -- 10 billion edits -- in 4 hours for under $20, on AWS ElasticMapReduce.
 
 Uses OpenStreetMap ORC files generated with [osm2orc](https://github.com/mojodna/osm2orc). This repo includes ORC-formatted data for Washington, DC to help you test your build locally. When you're ready to go global, you can use the planet history file [hosted by AWS](https://aws.amazon.com/public-datasets/osm/). 
+
+_Work in Progress_
 
 ## Building
 
