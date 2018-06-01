@@ -2,7 +2,7 @@ Generate easily queryable OpenStreetMap change histories using Spark. Process th
 
 Uses OpenStreetMap ORC files generated with [osm2orc](https://github.com/mojodna/osm2orc). This repo includes ORC-formatted data for Washington, DC to help you test your build locally. When you're ready to go global, you can use the planet history file [hosted by AWS](https://aws.amazon.com/public-datasets/osm/). 
 
-_Work in Progress_
+_This was a personal learning project that served its purpose admirably, and has now been shelved. A more robust version of this line of work by others is proceeding over at https://github.com/azavea/osmesa_
 
 ## Building
 
